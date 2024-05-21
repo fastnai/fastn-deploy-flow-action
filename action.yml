@@ -1,18 +1,49 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'Fastn Deploy Flow'
+description: 'Github Action for deploying flows'
+author: 'Fastn Inc.'
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
+  source-env:
+    description:
+      'Fastn environment URI from where to fetch the flow e.g. qa.fastn.ai,
+      prod.fastn.ai'
     required: true
-    default: '1000'
-
-# Define your outputs here.
-outputs:
-  time:
-    description: 'Your output description here'
+  source-project-id:
+    description: 'Project ID where the flow to deploy is present'
+    required: true
+  source-flow-name:
+    description:
+      'Name of the flow to deploy. For multiple flows a comma seperated list can
+      be used e.g. flow1,flow2'
+    required: true
+  source-account-username:
+    description:
+      'Username of the account from where the flow to deploy is present'
+    required: true
+  source-account-password:
+    description:
+      'Password of the account from where the flow to deploy is present'
+    required: true
+  destination-env:
+    description:
+      'Fastn environment from where to deploy the flow e.g. qa.fastn.ai,
+      prod.fastn.ai'
+    required: true
+  destination-project-id:
+    description: 'Project ID where the flow will be deployed'
+    required: true
+  destination-flow-name:
+    description:
+      'Optional - Name of the flow to be used in the destination project. For
+      multiple flows a comma seperated list can be used e.g. flow1,flow2 in the
+      same sequence as the source flows'
+  destination-account-username:
+    description: 'Username of the account where the flow will be deployed'
+    required: true
+  destination-account-password:
+    description: 'Password of the account where the flow will be deployed'
+    required: true
 
 runs:
   using: node20
