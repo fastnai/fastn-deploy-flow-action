@@ -1,12 +1,44 @@
 name: Continuous Integration
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      source-env:
+        required: true
+        type: string
+        description: 'source-env'
+      source-project-id:
+        required: true
+        type: string
+        description: 'source-project-id'
+      source-flow-name:
+        required: true
+        type: string
+        description: 'source-flow-name'
+      source-account-username:
+        required: true
+        type: string
+        description: 'source-account-username'
+      source-account-password:
+        required: true
+        type: string
+        description: 'source-account-password'
+      destination-env:
+        required: true
+        type: string
+        description: 'destination-env'
+      destination-project-id:
+        required: true
+        type: string
+        description: 'destination-project-id'
+      destination-account-username:
+        required: true
+        type: string
+        description: 'destination-account-username'
+      destination-account-password:
+        required: true
+        type: string
+        description: 'destination-account-password'
 
 permissions:
   contents: read
@@ -57,8 +89,17 @@ jobs:
         id: test-action
         uses: ./
         with:
-          milliseconds: 1000
-
-      - name: Print Output
-        id: output
-        run: echo "${{ steps.test-action.outputs.time }}"
+          source-env: ${{ github.event.inputs.source-env }}
+          source-project-id: ${{ github.event.inputs.source-project-id }}
+          source-flow-name: ${{ github.event.inputs.source-flow-name }}
+          source-account-username:
+            ${{ github.event.inputs.source-account-username }}
+          source-account-password:
+            ${{ github.event.inputs.source-account-password }}
+          destination-env: ${{ github.event.inputs.destination-env }}
+          destination-project-id:
+            ${{ github.event.inputs.destination-project-id }}
+          destination-account-username:
+            ${{ github.event.inputs.destination-account-username }}
+          destination-account-password:
+            ${{ github.event.inputs.destination-account-password }}
