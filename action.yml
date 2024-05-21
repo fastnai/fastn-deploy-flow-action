@@ -1,4 +1,4 @@
-name: 'Fastn Deploy Flow'
+name: 'Fastn Deploy Flow Action'
 description: 'Github Action for deploying flows'
 author: 'Fastn Inc.'
 
