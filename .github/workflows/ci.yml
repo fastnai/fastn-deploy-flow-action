@@ -3,18 +3,14 @@ name: Continuous Integration
 on:
   workflow_dispatch:
     inputs:
-      source-env:
+      source-domain:
         required: true
         type: string
-        description: 'source-env'
+        description: 'source-domain'
       source-project-id:
         required: true
         type: string
         description: 'source-project-id'
-      source-flow-name:
-        required: true
-        type: string
-        description: 'source-flow-name'
       source-account-username:
         required: true
         type: string
@@ -23,10 +19,13 @@ on:
         required: true
         type: string
         description: 'source-account-password'
-      destination-env:
+      source-flow-name:
+        type: string
+        description: 'source-flow-name'
+      destination-domain:
         required: true
         type: string
-        description: 'destination-env'
+        description: 'destination-domain'
       destination-project-id:
         required: true
         type: string
@@ -44,38 +43,6 @@ permissions:
   contents: read
 
 jobs:
-  test-javascript:
-    name: JavaScript Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        id: setup-node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: npm
-
-      - name: Install Dependencies
-        id: npm-ci
-        run: npm ci
-
-      - name: Check Format
-        id: npm-format-check
-        run: npm run format:check
-
-      - name: Lint
-        id: npm-lint
-        run: npm run lint
-
-      - name: Test
-        id: npm-ci-test
-        run: npm run ci-test
-
   test-action:
     name: GitHub Actions Test
     runs-on: ubuntu-latest
@@ -89,14 +56,14 @@ jobs:
         id: test-action
         uses: ./
         with:
-          source-env: ${{ github.event.inputs.source-env }}
+          source-domain: ${{ github.event.inputs.source-domain }}
           source-project-id: ${{ github.event.inputs.source-project-id }}
-          source-flow-name: ${{ github.event.inputs.source-flow-name }}
           source-account-username:
             ${{ github.event.inputs.source-account-username }}
           source-account-password:
             ${{ github.event.inputs.source-account-password }}
-          destination-env: ${{ github.event.inputs.destination-env }}
+          source-flow-name: ${{ github.event.inputs.source-flow-name}}
+          destination-domain: ${{ github.event.inputs.destination-domain }}
           destination-project-id:
             ${{ github.event.inputs.destination-project-id }}
           destination-account-username:

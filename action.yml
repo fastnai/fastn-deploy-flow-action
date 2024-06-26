@@ -4,7 +4,7 @@ author: 'Fastn Inc.'
 
 # Define your inputs here.
 inputs:
-  source-env:
+  source-domain:
     description:
       'Fastn environment URI from where to fetch the flow e.g. qa.fastn.ai,
       prod.fastn.ai'
@@ -14,9 +14,13 @@ inputs:
     required: true
   source-flow-name:
     description:
-      'Name of the flow to deploy. For multiple flows a comma seperated list can
-      be used e.g. flow1,flow2'
-    required: true
+      'Optional - Name of the flow to deploy. For multiple flows a comma
+      seperated list can be used e.g. flow1,flow2. If name is not provided all
+      flows will be fetched from source stage and deployed'
+  source-stage:
+    description:
+      'Optional - stage from where to pick the flows. e.g. QA, DRAFT, LIVE'
+    default: 'LIVE'
   source-account-username:
     description:
       'Username of the account from where the flow to deploy is present'
@@ -25,7 +29,11 @@ inputs:
     description:
       'Password of the account from where the flow to deploy is present'
     required: true
-  destination-env:
+  resources-to-export:
+    description:
+      'Config for which resources to export e.g. ALL, FLOWS, MODELS, CONNECTORS'
+    default: 'ALL'
+  destination-domain:
     description:
       'Fastn environment from where to deploy the flow e.g. qa.fastn.ai,
       prod.fastn.ai'
@@ -33,11 +41,10 @@ inputs:
   destination-project-id:
     description: 'Project ID where the flow will be deployed'
     required: true
-  destination-flow-name:
+  destination-stage:
     description:
-      'Optional - Name of the flow to be used in the destination project. For
-      multiple flows a comma seperated list can be used e.g. flow1,flow2 in the
-      same sequence as the source flows'
+      'Optional - stage where to deploy the flows. e.g. QA, DRAFT, LIVE'
+    default: 'LIVE'
   destination-account-username:
     description: 'Username of the account where the flow will be deployed'
     required: true

@@ -2,6 +2,13 @@ const core = require('@actions/core')
 const axios = require('axios')
 const qs = require('qs')
 
+const { deployApiFlowToStage } = require('./apis/flows')
+const { fetchAuthToken } = require('./apis/auth')
+const {
+  exportProjectResources,
+  importProjectResources
+} = require('./apis/projects')
+
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
@@ -14,7 +21,7 @@ async function run() {
     const srcPassword = core.getInput('source-account-password', {
       required: true
     })
-    const srcEnv = core.getInput('source-env', {
+    const srcDomain = core.getInput('source-domain', {
       required: true
     })
     const srcProjectId = core.getInput('source-project-id', {
@@ -23,6 +30,8 @@ async function run() {
     const srcFlowNameInput = core.getInput('source-flow-name', {
       required: true
     })
+    core.debug(` ${srcFlowNameInput}`)
+    const srcStage = core.getInput('source-stage')
 
     const desUsername = core.getInput('destination-account-username', {
       required: true
@@ -30,173 +39,121 @@ async function run() {
     const desPassword = core.getInput('destination-account-password', {
       required: true
     })
-    const desEnv = core.getInput('destination-env', {
+    const desDomain = core.getInput('destination-domain', {
       required: true
     })
     const desProjectId = core.getInput('destination-project-id', {
       required: true
     })
     const desFlowNameInput = core.getInput('destination-flow-name')
+    const desStage = core.getInput('destination-stage')
 
     const srcAuthToken = await fetchAuthToken(
       srcUsername,
       srcPassword,
-      pickEnv(srcEnv)
+      srcDomain
     )
     core.debug(`Fetched source auth token: ${srcAuthToken} for ${srcUsername}`)
 
-    const srcFlowNames = srcFlowNameInput
-      .split(', ')
-      .filter(item => item.trim() !== '')
-    console.log(`Flow names input: ${srcFlowNames}`)
-    const fetchedApis = []
+    const exportData = await exportProjectResources(
+      srcAuthToken,
+      srcProjectId,
+      srcDomain,
+      srcStage
+    )
 
-    for (const flowName of srcFlowNames) {
-      const fetchedApi = await fetchApiFlow(
-        srcAuthToken,
-        srcProjectId,
-        flowName,
-        pickEnv(srcEnv)
-      )
-      fetchedApis.push(fetchedApi)
-      core.debug(
-        `Fetched flow: ${JSON.stringify(fetchedApi)} for ${srcUsername}`
-      )
-    }
+    core.debug(`Exported project resources from ${srcProjectId}.`)
+
+    // Fetch APIs
+
+    //   for (const flowName of srcFlowNames) {
+    //     const fetchedApi = await flows.fetchApiFlow(
+    //       srcAuthToken,
+    //       srcProjectId,
+    //       flowName,
+    //       srcDomain
+    //     )
+    //     fetchedApis.push(fetchedApi)
+    //     core.debug(
+    //       `Fetched flow: ${JSON.stringify(fetchedApi)} for ${srcUsername}`
+    //     )
+    //   }
+    // } else {
+    //   fetchedApis = await flows.fetchApiFlowsByStage(
+    //     srcAuthToken,
+    //     srcProjectId,
+    //     srcDomain,
+    //     srcStage
+    //   )
+
+    //   for (const api of fetchedApis) {
+    //     srcFlowNames.push(api.api.name)
+    //   }
+
+    //   core.debug(
+    //     `Fetched flows: ${JSON.stringify(fetchedApis)} for ${srcUsername}`
+    //   )
+    // }
 
     const desAuthToken = await fetchAuthToken(
       desUsername,
       desPassword,
-      pickEnv(desEnv)
+      desDomain
     )
-    core.debug(`Fetched source auth token: ${desAuthToken} for ${desUsername}`)
+    core.debug(
+      `Fetched destination auth token: ${desAuthToken} for ${desUsername}`
+    )
 
-    let desFlowNames
+    // filter out specific apis here
+    let srcFlowNames = []
+    let apisToImport = []
 
-    if (desFlowNameInput) {
-      desFlowNames = desFlowNameInput
-        .split(',')
+    if (srcFlowNameInput) {
+      srcFlowNames = srcFlowNameInput
+        .split(', ')
         .filter(item => item.trim() !== '')
+      core.debug(`Flow names input: ${srcFlowNames}`)
+
+      apisToImport = exportData.apis.filter(api =>
+        srcFlowNames.includes('activateMicrosoftGraph')
+      )
     } else {
-      desFlowNames = srcFlowNames
+      apisToImport = exportData.apis
     }
 
-    let nameCount = 0
-    for (const api of fetchedApis) {
-      await importApiFlow(
+    core.debug(`Apis to import ${apisToImport}`)
+
+    const fetchedFlowNames = []
+
+    for (const flow of apisToImport) {
+      fetchedFlowNames.push(flow.name)
+    }
+
+    // import project resources
+    await importProjectResources(
+      desAuthToken,
+      desProjectId,
+      desDomain,
+      apisToImport,
+      exportData.models,
+      exportData.connectors
+    )
+    core.debug(`Imported project resources in ${desProjectId}`)
+
+    // // deploy flows
+    for (const apiName of fetchedFlowNames) {
+      await deployApiFlowToStage(
         desAuthToken,
         desProjectId,
-        desFlowNames[nameCount],
-        api,
-        pickEnv(desEnv)
+        apiName,
+        desStage,
+        desDomain
       )
-
-      core.debug(
-        `Imported ${srcFlowNames[nameCount]} from ${srcProjectId} as ${desFlowNames[nameCount]} in ${desProjectId}`
-      )
-      nameCount++
+      core.debug(`Deployed ${apiName} to ${desStage}`)
     }
   } catch (error) {
     core.setFailed(error.message)
   }
-}
-
-// Fetch token function
-async function fetchAuthToken(username, password, env) {
-  const data = qs.stringify({
-    grant_type: 'password',
-    username,
-    password,
-    client_id: 'fastn-app',
-    scope: 'openid'
-  })
-
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://auth.${env}/realms/fastn/protocol/openid-connect/token`,
-    headers: {
-      realm: 'fastn',
-      'Content-Type': 'application/x-www-form-urlencoded'
-    },
-    data
-  }
-
-  try {
-    const response = await axios.request(config)
-    return response.data.access_token
-  } catch (error) {
-    core.debug(
-      `Unable to retrieve auth token for ${username} in ${env}. Error: ${error}`
-    )
-  }
-}
-
-// Fetch API
-async function fetchApiFlow(authToken, projectId, apiName, env) {
-  const data = JSON.stringify({
-    query: `query exportApi($input: GetEntityInput) {
-    exportApi(input: $input) 
-  }`,
-    variables: { input: { clientId: projectId, id: apiName } }
-  })
-
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${env}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      stage: 'LIVE',
-      realm: 'fastn'
-    },
-    data
-  }
-
-  try {
-    const response = await axios.request(config)
-    return response.data.data.exportApi
-  } catch (error) {
-    core.debug(`Unable to fetch flow ${apiName}. Error: ${error}`)
-  }
-}
-
-// Import API Flow
-async function importApiFlow(authToken, projectId, apiName, apiData, env) {
-  const data = JSON.stringify({
-    query: `mutation importApi($input: ImportApiInput!) {
-      importApi(input: $input) {
-        __typename
-      }
-    }`,
-    variables: { input: { clientId: projectId, name: apiName, data: apiData } }
-  })
-
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${env}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
-
-  try {
-    const response = await axios.request(config)
-  } catch (error) {
-    core.debug(`Unable to import flow ${apiName}. Error: ${error}`)
-  }
-}
-
-//Helper - set url
-function pickEnv(env) {
-  return env
 }
 
 module.exports = {

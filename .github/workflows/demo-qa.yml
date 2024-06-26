@@ -15,12 +15,11 @@ jobs:
       - name: Fastn Deploy Flow
         uses: fastnai/fastn-deploy-flow-action@v0.1.0
         with:
-          source-env: ${{ vars.QA_URI }}
+          source-domain: ${{ vars.QA_URI }}
           source-project-id: ${{ vars.QA_SOURCE_PROJECT_ID }}
-          source-flow-name: ${{ vars.QA_FLOW_NAMES }}
           source-account-username: ${{ secrets.QA_USERNAME }}
           source-account-password: ${{ secrets.QA_PSWD }}
-          destination-env: ${{ vars.QA_URI }}
+          destination-domain: ${{ vars.QA_URI }}
           destination-project-id: ${{ vars.QA_DESTINATION_PROJECT_ID }}
           destination-account-username: ${{ secrets.QA_USERNAME }}
           destination-account-password: ${{ secrets.QA_PSWD }}
