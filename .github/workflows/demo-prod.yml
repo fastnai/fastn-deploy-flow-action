@@ -10,6 +10,7 @@ jobs:
   deploy-to-prod:
     name: Deploy To PROD
     runs-on: ubuntu-latest
+    environment: Demo
 
     steps:
       - name: Fastn Deploy Flow
