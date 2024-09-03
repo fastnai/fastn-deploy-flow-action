@@ -3,94 +3,12 @@ name: Continuous Integration
 on:
   workflow_dispatch:
     inputs:
-      # Source Inputs
-      source-domain:
+      input-json:
+        description: JSON of inputs
+        type: string
+        default: '{}'
         required: true
-        type: string
-        description: 'source-domain'
-      source-project-id:
-        required: true
-        type: string
-        description: 'source-project-id'
-      source-resources:
-        type: string
-        description: 'source-resources'
-      # Flow Inputs
-      source-flow-names:
-        type: string
-        description: 'source-flow-names'
-      source-flow-stage:
-        type: string
-        description: 'source-flow-stage'
-      # Connector Inputs
-      source-connector-org-id:
-        type: string
-        description: 'source-connector-org-id'
-      source-connector-group-ids:
-        type: string
-        description: 'source-connector-group-ids'
-      source-connector-ids:
-        type: string
-        description: 'source-connector-ids'
-      # Model Inputs
-      source-model-ids:
-        type: string
-        description: 'source-model-ids'
-      # Template Inputs
-      source-template-ids:
-        type: string
-        description: 'source-template-ids'
-      source-template-org-id:
-        type: string
-        description: 'source-template-org-id'
-      # Webhook Inputs
-      source-webhook-ids:
-        type: string
-        description: 'source-webhook-ids'
-      # Widget Inputs
-      source-widget-ids:
-        type: string
-        description: 'source-widget-ids'
-      # Source Auth
-      source-account-username:
-        required: true
-        type: string
-        description: 'source-account-username'
-      source-account-password:
-        required: true
-        type: string
-        description: 'source-account-password'
-      # Destination Inputs
-      destination-domain:
-        required: true
-        type: string
-        description: 'destination-domain'
-      destination-project-id:
-        required: true
-        type: string
-        description: 'destination-project-id'
-      # Flow Inputs
-      destination-flow-stage:
-        type: string
-        description: 'destination-flow-stage'
-      # Connector Inputs
-      destination-connector-org-id:
-        type: string
-        description: 'destination-connector-org-id'
-      # Template Inputs
-      destination-template-org-id:
-        type: string
-        description: 'destination-template-org-id'
-      # Destination Auth
-      destination-account-username:
-        required: true
-        type: string
-        description: 'destination-account-username'
-      destination-account-password:
-        required: true
-        type: string
-        description: 'destination-account-password'
-
+ 
 permissions:
   contents: read
 
@@ -109,46 +27,53 @@ jobs:
         uses: ./
         with:
           # Source Inputs
-          source-domain: ${{ github.event.inputs.source-domain }}
-          source-project-id: ${{ github.event.inputs.source-project-id }}
-          source-resources: ${{ github.event.inputs.source-resources }}
+          source-domain: ${{ fromJson(inputs.input-json).source-domain }}
+          source-project-id:
+            ${{ fromJson(inputs.input-json).source-project-id }}
+          source-resources: ${{ fromJson(inputs.input-json).source-resources }}
           # Flow Inputs
-          source-flow-names: ${{ github.event.inputs.source-flow-names }}
-          source-flow-stage: ${{ github.event.inputs.source-flow-stage }}
+          source-flow-names:
+            ${{ fromJson(inputs.input-json).source-flow-names }}
+          source-flow-stage:
+            ${{ fromJson(inputs.input-json).source-flow-stage }}
           # Connector Inputs
           source-connector-org-id:
-            ${{ github.event.inputs.source-connector-org-id }}
+            ${{ fromJson(inputs.input-json).source-connector-org-id }}
           source-connector-group-ids:
-            ${{ github.event.inputs.source-connector-group-ids }}
-          source-connector-ids: ${{ github.event.inputs.source-connector-ids }}
+            ${{ fromJson(inputs.input-json).source-connector-group-ids }}
+          source-connector-ids:
+            ${{ fromJson(inputs.input-json).source-connector-ids }}
           # Model Inputs
-          source-model-ids: ${{ github.event.inputs.source-model-ids }}
+          source-model-ids: ${{ fromJson(inputs.input-json).source-model-ids }}
           # Template Inputs
-          source-template-ids: ${{ github.event.inputs.source-template-ids }}
+          source-template-ids:
+            ${{ fromJson(inputs.input-json).source-template-ids }}
           source-template-org-id:
-            ${{ github.event.inputs.source-template-org-id }}
+            ${{ fromJson(inputs.input-json).source-template-org-id }}
           # Webhook Inputs
-          source-webhook-ids: ${{ github.event.inputs.source-webhook-ids }}
+          source-webhook-ids:
+            ${{ fromJson(inputs.input-json).source-webhook-ids }}
           # Widget Inputs
-          source-widget-ids: ${{ github.event.inputs.source-widget-ids }}
+          source-widget-ids:
+            ${{ fromJson(inputs.input-json).source-widget-ids }}
           # Source Auth
           source-account-username:
-            ${{ github.event.inputs.source-account-username }}
+            ${{ fromJson(inputs.input-json).source-account-username }}
           source-account-password:
-            ${{ github.event.inputs.source-account-password }}
-          source-flow-name: ${{ github.event.inputs.source-flow-name}}
+            ${{ fromJson(inputs.input-json).source-account-password }}
           # Destination Domain
-          destination-domain: ${{ github.event.inputs.destination-domain }}
+          destination-domain:
+            ${{ fromJson(inputs.input-json).destination-domain }}
           destination-project-id:
-            ${{ github.event.inputs.destination-project-id }}
+            ${{ fromJson(inputs.input-json).destination-project-id }}
           # Flow Inputs
           destination-flow-stage:
-            ${{ github.event.inputs.destination-flow-stage }}
+            ${{ fromJson(inputs.input-json).destination-flow-stage }}
           # Template Inputs
           destination-template-org-id:
-            ${{ github.event.inputs.destination-template-org-id }}
+            ${{ fromJson(inputs.input-json).destination-template-org-id }}
           # Destination Auth
           destination-account-username:
-            ${{ github.event.inputs.destination-account-username }}
+            ${{ fromJson(inputs.input-json).destination-account-username }}
           destination-account-password:
-            ${{ github.event.inputs.destination-account-password }}
+            ${{ fromJson(inputs.input-json).destination-account-password }}

@@ -1,3 +1,3 @@
-# Fastn Deploy Flow Github Action
+# Fastn Deploy Flow GitHub Action
 
 Test Release v0.1.0
