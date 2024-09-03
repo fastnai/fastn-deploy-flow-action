@@ -16,12 +16,11 @@ jobs:
       - name: Fastn Deploy Flow
         uses: fastnai/fastn-deploy-flow-action@v0.1.0
         with:
-          source-env: ${{ vars.PROD_URI }}
+          source-domain: ${{ vars.PROD_URI }}
           source-project-id: ${{ vars.PROD_SOURCE_PROJECT_ID }}
-          source-flow-name: ${{ vars.PROD_FLOW_NAMES }}
           source-account-username: ${{ secrets.PROD_USERNAME }}
           source-account-password: ${{ secrets.PROD_PSWD }}
-          destination-env: ${{ vars.PROD_URI }}
+          destination-domain: ${{ vars.PROD_URI }}
           destination-project-id: ${{ vars.PROD_DESTINATION_PROJECT_ID }}
           destination-account-username: ${{ secrets.PROD_USERNAME }}
           destination-account-password: ${{ secrets.PROD_PSWD }}

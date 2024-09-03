@@ -3,79 +3,16 @@ name: Continuous Integration
 on:
   workflow_dispatch:
     inputs:
-      source-env:
-        required: true
+      input-json:
+        description: JSON of inputs
         type: string
-        description: 'source-env'
-      source-project-id:
+        default: '{}'
         required: true
-        type: string
-        description: 'source-project-id'
-      source-flow-name:
-        required: true
-        type: string
-        description: 'source-flow-name'
-      source-account-username:
-        required: true
-        type: string
-        description: 'source-account-username'
-      source-account-password:
-        required: true
-        type: string
-        description: 'source-account-password'
-      destination-env:
-        required: true
-        type: string
-        description: 'destination-env'
-      destination-project-id:
-        required: true
-        type: string
-        description: 'destination-project-id'
-      destination-account-username:
-        required: true
-        type: string
-        description: 'destination-account-username'
-      destination-account-password:
-        required: true
-        type: string
-        description: 'destination-account-password'
-
+ 
 permissions:
   contents: read
 
 jobs:
-  test-javascript:
-    name: JavaScript Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        id: checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        id: setup-node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: npm
-
-      - name: Install Dependencies
-        id: npm-ci
-        run: npm ci
-
-      - name: Check Format
-        id: npm-format-check
-        run: npm run format:check
-
-      - name: Lint
-        id: npm-lint
-        run: npm run lint
-
-      - name: Test
-        id: npm-ci-test
-        run: npm run ci-test
-
   test-action:
     name: GitHub Actions Test
     runs-on: ubuntu-latest
@@ -89,17 +26,54 @@ jobs:
         id: test-action
         uses: ./
         with:
-          source-env: ${{ github.event.inputs.source-env }}
-          source-project-id: ${{ github.event.inputs.source-project-id }}
-          source-flow-name: ${{ github.event.inputs.source-flow-name }}
+          # Source Inputs
+          source-domain: ${{ fromJson(inputs.input-json).source-domain }}
+          source-project-id:
+            ${{ fromJson(inputs.input-json).source-project-id }}
+          source-resources: ${{ fromJson(inputs.input-json).source-resources }}
+          # Flow Inputs
+          source-flow-names:
+            ${{ fromJson(inputs.input-json).source-flow-names }}
+          source-flow-stage:
+            ${{ fromJson(inputs.input-json).source-flow-stage }}
+          # Connector Inputs
+          source-connector-org-id:
+            ${{ fromJson(inputs.input-json).source-connector-org-id }}
+          source-connector-group-ids:
+            ${{ fromJson(inputs.input-json).source-connector-group-ids }}
+          source-connector-ids:
+            ${{ fromJson(inputs.input-json).source-connector-ids }}
+          # Model Inputs
+          source-model-ids: ${{ fromJson(inputs.input-json).source-model-ids }}
+          # Template Inputs
+          source-template-ids:
+            ${{ fromJson(inputs.input-json).source-template-ids }}
+          source-template-org-id:
+            ${{ fromJson(inputs.input-json).source-template-org-id }}
+          # Webhook Inputs
+          source-webhook-ids:
+            ${{ fromJson(inputs.input-json).source-webhook-ids }}
+          # Widget Inputs
+          source-widget-ids:
+            ${{ fromJson(inputs.input-json).source-widget-ids }}
+          # Source Auth
           source-account-username:
-            ${{ github.event.inputs.source-account-username }}
+            ${{ fromJson(inputs.input-json).source-account-username }}
           source-account-password:
-            ${{ github.event.inputs.source-account-password }}
-          destination-env: ${{ github.event.inputs.destination-env }}
+            ${{ fromJson(inputs.input-json).source-account-password }}
+          # Destination Domain
+          destination-domain:
+            ${{ fromJson(inputs.input-json).destination-domain }}
           destination-project-id:
-            ${{ github.event.inputs.destination-project-id }}
+            ${{ fromJson(inputs.input-json).destination-project-id }}
+          # Flow Inputs
+          destination-flow-stage:
+            ${{ fromJson(inputs.input-json).destination-flow-stage }}
+          # Template Inputs
+          destination-template-org-id:
+            ${{ fromJson(inputs.input-json).destination-template-org-id }}
+          # Destination Auth
           destination-account-username:
-            ${{ github.event.inputs.destination-account-username }}
+            ${{ fromJson(inputs.input-json).destination-account-username }}
           destination-account-password:
-            ${{ github.event.inputs.destination-account-password }}
+            ${{ fromJson(inputs.input-json).destination-account-password }}

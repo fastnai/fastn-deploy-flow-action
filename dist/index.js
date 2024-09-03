@@ -8795,114 +8795,14 @@ exports["default"] = _default;
 
 /***/ }),
 
-/***/ 1713:
+/***/ 7187:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const core = __nccwpck_require__(2186)
 const axios = __nccwpck_require__(8757)
 const qs = __nccwpck_require__(2760)
 
-/**
- * The main function for the action.
- * @returns {Promise<void>} Resolves when the action is complete.
- */
-async function run() {
-  try {
-    const srcUsername = core.getInput('source-account-username', {
-      required: true
-    })
-    const srcPassword = core.getInput('source-account-password', {
-      required: true
-    })
-    const srcEnv = core.getInput('source-env', {
-      required: true
-    })
-    const srcProjectId = core.getInput('source-project-id', {
-      required: true
-    })
-    const srcFlowNameInput = core.getInput('source-flow-name', {
-      required: true
-    })
-
-    const desUsername = core.getInput('destination-account-username', {
-      required: true
-    })
-    const desPassword = core.getInput('destination-account-password', {
-      required: true
-    })
-    const desEnv = core.getInput('destination-env', {
-      required: true
-    })
-    const desProjectId = core.getInput('destination-project-id', {
-      required: true
-    })
-    const desFlowNameInput = core.getInput('destination-flow-name')
-
-    const srcAuthToken = await fetchAuthToken(
-      srcUsername,
-      srcPassword,
-      pickEnv(srcEnv)
-    )
-    core.debug(`Fetched source auth token: ${srcAuthToken} for ${srcUsername}`)
-
-    const srcFlowNames = srcFlowNameInput
-      .split(', ')
-      .filter(item => item.trim() !== '')
-    console.log(`Flow names input: ${srcFlowNames}`)
-    const fetchedApis = []
-
-    for (const flowName of srcFlowNames) {
-      const fetchedApi = await fetchApiFlow(
-        srcAuthToken,
-        srcProjectId,
-        flowName,
-        pickEnv(srcEnv)
-      )
-      fetchedApis.push(fetchedApi)
-      core.debug(
-        `Fetched flow: ${JSON.stringify(fetchedApi)} for ${srcUsername}`
-      )
-    }
-
-    const desAuthToken = await fetchAuthToken(
-      desUsername,
-      desPassword,
-      pickEnv(desEnv)
-    )
-    core.debug(`Fetched source auth token: ${desAuthToken} for ${desUsername}`)
-
-    let desFlowNames
-
-    if (desFlowNameInput) {
-      desFlowNames = desFlowNameInput
-        .split(',')
-        .filter(item => item.trim() !== '')
-    } else {
-      desFlowNames = srcFlowNames
-    }
-
-    let nameCount = 0
-    for (const api of fetchedApis) {
-      await importApiFlow(
-        desAuthToken,
-        desProjectId,
-        desFlowNames[nameCount],
-        api,
-        pickEnv(desEnv)
-      )
-
-      core.debug(
-        `Imported ${srcFlowNames[nameCount]} from ${srcProjectId} as ${desFlowNames[nameCount]} in ${desProjectId}`
-      )
-      nameCount++
-    }
-  } catch (error) {
-    core.setFailed(error.message)
-  }
-}
-
-// Fetch token function
-async function fetchAuthToken(username, password, env) {
+async function fetchAuthToken(username, password, domain) {
   const data = qs.stringify({
     grant_type: 'password',
     username,
@@ -8914,7 +8814,7 @@ async function fetchAuthToken(username, password, env) {
   const config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: `https://auth.${env}/realms/fastn/protocol/openid-connect/token`,
+    url: `https://auth.${domain}/realms/fastn/protocol/openid-connect/token`,
     headers: {
       realm: 'fastn',
       'Content-Type': 'application/x-www-form-urlencoded'
@@ -8927,57 +8827,158 @@ async function fetchAuthToken(username, password, env) {
     return response.data.access_token
   } catch (error) {
     core.debug(
-      `Unable to retrieve auth token for ${username} in ${env}. Error: ${error}`
+      `Unable to retrieve auth token for ${username} in ${domain}. Error: ${error}`
     )
   }
 }
 
-// Fetch API
-async function fetchApiFlow(authToken, projectId, apiName, env) {
+module.exports = {
+  fetchAuthToken
+}
+
+
+/***/ }),
+
+/***/ 8420:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportConnectors(
+  authToken,
+  projectId,
+  orgId,
+  connectorIds,
+  groupIds,
+  domain
+) {
   const data = JSON.stringify({
-    query: `query exportApi($input: GetEntityInput) {
-    exportApi(input: $input) 
-  }`,
-    variables: { input: { clientId: projectId, id: apiName } }
+    query: `query exportConnectors($input: ExportConnectorsGroupInput!) {
+      exportConnectors(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, connectorId: orgId, connectorIds, groupIds }
+    }
   })
 
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${env}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      stage: 'LIVE',
-      realm: 'fastn'
-    },
-    data
-  }
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
+    core.debug(`${JSON.stringify(config)}`)
     const response = await axios.request(config)
-    return response.data.data.exportApi
+    core.debug(
+      `Fetched connectors: ${JSON.stringify(response.data.data.exportConnectors)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportConnectors
   } catch (error) {
-    core.debug(`Unable to fetch flow ${apiName}. Error: ${error}`)
+    core.debug(`Unable to fetch connectors. Error: ${error}`)
   }
 }
 
-// Import API Flow
-async function importApiFlow(authToken, projectId, apiName, apiData, env) {
+async function importConnectors(
+  authToken,
+  projectId,
+  orgId,
+  connectors,
+  domain
+) {
   const data = JSON.stringify({
-    query: `mutation importApi($input: ImportApiInput!) {
-      importApi(input: $input) {
+    query: `mutation importConnectors($input: ImportConnectorsResourcesInput) {
+      importConnectors(input: $input) 
+    }`,
+    variables: { input: { projectId, connectorId: orgId, connectors } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import connectors. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportConnectors,
+  importConnectors
+}
+
+
+/***/ }),
+
+/***/ 1906:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportApis(authToken, projectId, domain, stage, ids) {
+  const data = JSON.stringify({
+    query: `query exportApis($input: ExportApisInput) {
+      exportApis(input: $input) 
+    }`,
+    variables: { input: { projectId, stage, ids } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(`${JSON.stringify(config)}`)
+    core.debug(`${JSON.stringify(ids)}`)
+    core.debug(
+      `Fetched flows: ${JSON.stringify(response.data.data.exportApis)} from ${projectId} and stage ${stage} on ${domain}`
+    )
+    return response.data.data.exportApis
+  } catch (error) {
+    core.debug(`Unable to fetch flows. Error: ${error}`)
+  }
+}
+
+async function importApis(authToken, projectId, apis, stage, domain) {
+  const data = JSON.stringify({
+    query: `mutation importApis($input: ImportApisInput) {
+      importApis(input: $input) 
+    }`,
+    variables: { input: { projectId, apis, stage } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import flows. Error: ${error}`)
+  }
+}
+
+async function deployApiFlowToStage(
+  authToken,
+  projectId,
+  apiName,
+  stage,
+  domain
+) {
+  const data = JSON.stringify({
+    query: `mutation deployApiToStage($input: deployApiToStageInput!) {
+      deployApiToStage(input: $input) {
         __typename
       }
     }`,
-    variables: { input: { clientId: projectId, name: apiName, data: apiData } }
+    variables: { input: { clientId: projectId, id: apiName, env: stage } }
   })
 
   const config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: `https://api.${env}/graphql`,
+    url: `https://api.${domain}/graphql`,
     headers: {
       authorization: `Bearer ${authToken}`,
       'content-type': 'application/json',
@@ -8989,18 +8990,580 @@ async function importApiFlow(authToken, projectId, apiName, apiData, env) {
 
   try {
     const response = await axios.request(config)
+    core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import flow ${apiName}. Error: ${error}`)
+    core.debug(`Unable to deploy flow ${apiName}. Error: ${error}`)
   }
 }
 
-//Helper - set url
-function pickEnv(env) {
-  return env
+module.exports = {
+  exportApis,
+  importApis,
+  deployApiFlowToStage
+}
+
+
+/***/ }),
+
+/***/ 1300:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportModels(authToken, projectId, ids, domain) {
+  const data = JSON.stringify({
+    query: `query exportModels($input: ExportModelsInput) {
+      exportModels(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, ids }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched models: ${JSON.stringify(response.data.data.exportModels)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportModels
+  } catch (error) {
+    core.debug(`Unable to fetch models. Error: ${error}`)
+  }
+}
+
+async function importModels(authToken, projectId, models, domain) {
+  const data = JSON.stringify({
+    query: `mutation importModels($input: ImportModelsInput) {
+      importModels(input: $input) 
+    }`,
+    variables: { input: { projectId, models } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import models. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportModels,
+  importModels
+}
+
+
+/***/ }),
+
+/***/ 2051:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportTemplates(authToken, projectId, orgId, ids, domain) {
+  const data = JSON.stringify({
+    query: `query exportTemplates($input: ExportTemplatesInput) {
+      exportTemplates(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, orgId, ids }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched templates: ${JSON.stringify(response.data.data.exportTemplates)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportTemplates
+  } catch (error) {
+    core.debug(`Unable to fetch templates. Error: ${error}`)
+  }
+}
+
+async function importTemplates(authToken, projectId, orgId, templates, domain) {
+  const data = JSON.stringify({
+    query: `mutation importTemplates($input: ImportTemplatesInput) {
+      importTemplates(input: $input) 
+    }`,
+    variables: { input: { projectId, orgId, templates } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import templates. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportTemplates,
+  importTemplates
+}
+
+
+/***/ }),
+
+/***/ 4817:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportWebhooks(authToken, projectId, ids, domain) {
+  const data = JSON.stringify({
+    query: `query exportWebhooks($input: ExportWebhooksInput) {
+      exportWebhooks(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, ids }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched webhooks: ${JSON.stringify(response.data.data.exportWebhooks)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportWebhooks
+  } catch (error) {
+    core.debug(`Unable to fetch webhooks. Error: ${error}`)
+  }
+}
+
+async function importWebhooks(authToken, projectId, webhooks, domain) {
+  const data = JSON.stringify({
+    query: `mutation importWebhooks($input: ImportWebhooksInput) {
+      importWebhooks(input: $input) 
+    }`,
+    variables: { input: { projectId, webhooks } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import webhooks. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportWebhooks,
+  importWebhooks
+}
+
+
+/***/ }),
+
+/***/ 3601:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportWidgetConnectors(authToken, projectId, ids, domain) {
+  const data = JSON.stringify({
+    query: `query exportWidgetConnectors($input: ExportWidgetConnectorsInput) {
+      exportWidgetConnectors(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, ids }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched widget connectors: ${JSON.stringify(response.data.data.exportWidgetConnectors)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportWidgetConnectors
+  } catch (error) {
+    core.debug(`Unable to fetch widget connectors. Error: ${error}`)
+  }
+}
+
+async function importWidgetConnectors(
+  authToken,
+  projectId,
+  widgetConnectors,
+  domain
+) {
+  const data = JSON.stringify({
+    query: `mutation importWidgetConnectors($input: ImportWidgetConnectorsInput) {
+      importWidgetConnectors(input: $input) 
+    }`,
+    variables: { input: { projectId, widgetConnectors } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import widget connectors. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportWidgetConnectors,
+  importWidgetConnectors
+}
+
+
+/***/ }),
+
+/***/ 1713:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+
+const { importApis, deployApiFlowToStage, exportApis } = __nccwpck_require__(1906)
+const { fetchAuthToken } = __nccwpck_require__(7187)
+const { splitString, parseResourcesToExport } = __nccwpck_require__(126)
+const { exportConnectors, importConnectors } = __nccwpck_require__(8420)
+const { exportWebhooks, importWebhooks } = __nccwpck_require__(4817)
+const {
+  exportWidgetConnectors,
+  importWidgetConnectors
+} = __nccwpck_require__(3601)
+const { exportModels, importModels } = __nccwpck_require__(1300)
+const { exportTemplates, importTemplates } = __nccwpck_require__(2051)
+
+/**
+ * The main function for the action.
+ * @returns {Promise<void>} Resolves when the action is complete.
+ */
+async function run() {
+  try {
+    // Source Inputs TODO: Cleanup
+    const srcUsername = core.getInput('source-account-username', {
+      required: true
+    })
+    const srcPassword = core.getInput('source-account-password', {
+      required: true
+    })
+    const srcDomain = core.getInput('source-domain', {
+      required: true
+    })
+    const srcProjectId = core.getInput('source-project-id', {
+      required: true
+    })
+    const resourcesToExport = core.getInput('source-resources')
+    // Flow Inputs
+    const srcFlowNameInput = core.getInput('source-flow-names')
+    const srcFlowStage = core.getInput('source-flow-stage')
+    // Connector Inputs
+    const srcConnectorIdInput = core.getInput('source-connector-ids')
+    const srcConnectorOrgId = core.getInput('source-connector-org-id')
+    const srcConnectorGroupIdInput = core.getInput('source-connector-group-ids')
+    // Model Inputs
+    const srcModelIdInput = core.getInput('source-model-ids')
+    // Template Inputs
+    const srcTemplateIdInput = core.getInput('source-template-ids')
+    const srcTemplateOrgId = core.getInput('source-template-org-id')
+    // Webhook Inputs
+    const srcWebhookIdInput = core.getInput('source-webhook-ids')
+    // Widget Inputs
+    const srcWidgetIdInput = core.getInput('source-widget-ids')
+
+    // Destination Inputs
+    const desUsername = core.getInput('destination-account-username', {
+      required: true
+    })
+    const desPassword = core.getInput('destination-account-password', {
+      required: true
+    })
+    const desDomain = core.getInput('destination-domain', {
+      required: true
+    })
+    const desProjectId = core.getInput('destination-project-id', {
+      required: true
+    })
+    // Flow Inputs
+    const desFlowStage = core.getInput('destination-flow-stage')
+    // Connector Inputs
+    const desConnectorOrgId = core.getInput('destination-connector-org-id')
+    // Template Inputs
+    const desTemplateOrgId = core.getInput('destination-template-org-id')
+
+    const resourceFlags = parseResourcesToExport(resourcesToExport)
+
+    const srcAuthToken = await fetchAuthToken(
+      srcUsername,
+      srcPassword,
+      srcDomain
+    )
+    core.debug(`Fetched source auth token: ${srcAuthToken} for ${srcUsername}`)
+
+    const desAuthToken = await fetchAuthToken(
+      desUsername,
+      desPassword,
+      desDomain
+    )
+    core.debug(
+      `Fetched destination auth token: ${desAuthToken} for ${desUsername}`
+    )
+
+    // Export and Import Connectors
+    if (resourceFlags.exportConnectors) {
+      core.debug(`Exporting Connectors`)
+      const exportedConnectors = await exportConnectors(
+        srcAuthToken,
+        srcProjectId,
+        srcConnectorOrgId,
+        splitString(srcConnectorIdInput),
+        splitString(srcConnectorGroupIdInput),
+        srcDomain
+      )
+
+      if (exportedConnectors) {
+        core.debug(`Importing Connectors`)
+        await importConnectors(
+          desAuthToken,
+          desProjectId,
+          desConnectorOrgId,
+          exportedConnectors,
+          desDomain
+        )
+      }
+    }
+
+    // Export and Import Templates
+    if (resourceFlags.exportTemplates) {
+      core.debug(`Exporting Templates`)
+      const exportedTemplates = await exportTemplates(
+        srcAuthToken,
+        srcProjectId,
+        srcTemplateOrgId,
+        splitString(srcTemplateIdInput),
+        srcDomain
+      )
+
+      if (exportedTemplates) {
+        core.debug(`Importing Templates`)
+        await importTemplates(
+          desAuthToken,
+          desProjectId,
+          desTemplateOrgId,
+          exportedTemplates,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Models
+    if (resourceFlags.exportModels) {
+      core.debug(`Exporting Models`)
+      const exportedModels = await exportModels(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcModelIdInput),
+        srcDomain
+      )
+
+      if (exportedModels) {
+        core.debug(`Importing Models`)
+        await importModels(
+          desAuthToken,
+          desProjectId,
+          exportedModels,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Flows
+    if (resourceFlags.exportFlows) {
+      core.debug(`Exporting Flows`)
+      core.debug(`${JSON.stringify(splitString(srcFlowNameInput))}`)
+      const exportedFlows = await exportApis(
+        srcAuthToken,
+        srcProjectId,
+        srcDomain,
+        srcFlowStage || 'LIVE',
+        splitString(srcFlowNameInput)
+      )
+
+      if (exportedFlows) {
+        core.debug(`Importing Flows`)
+        await importApis(
+          desAuthToken,
+          desProjectId,
+          exportedFlows,
+          desFlowStage || 'LIVE',
+          desDomain
+        )
+
+        core.debug(`Deploying Flows`)
+        for (const apiName of splitString(srcFlowNameInput)) {
+          await deployApiFlowToStage(
+            desAuthToken,
+            desProjectId,
+            apiName,
+            desFlowStage,
+            desDomain
+          )
+          core.debug(`Deployed ${apiName} to ${desFlowStage}`)
+        }
+      }
+    }
+    // Export and Import Webhooks
+    if (resourceFlags.exportWebhooks) {
+      core.debug(`Exporting Webhooks`)
+      const exportedWebhooks = await exportWebhooks(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcWebhookIdInput),
+        srcDomain
+      )
+
+      if (exportedWebhooks) {
+        core.debug(`Importing Webhooks`)
+        await importWebhooks(
+          desAuthToken,
+          desProjectId,
+          exportedWebhooks,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Widgets
+    if (resourceFlags.exportWidgets) {
+      core.debug(`Exporting Widgets`)
+      const exportedWidgetConnectors = await exportWidgetConnectors(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcWidgetIdInput),
+        srcDomain
+      )
+
+      if (exportedWidgetConnectors) {
+        core.debug(`Importing Widgets`)
+        await importWidgetConnectors(
+          desAuthToken,
+          desProjectId,
+          exportedWidgetConnectors,
+          desDomain
+        )
+      }
+    }
+  } catch (error) {
+    core.setFailed(error.message)
+  }
 }
 
 module.exports = {
   run
+}
+
+
+/***/ }),
+
+/***/ 126:
+/***/ ((module) => {
+
+function parseResourcesToExport(resourcesInput) {
+  const resourcesList = splitString(resourcesInput).map(resource =>
+    resource.toUpperCase().replace(/S$/, '')
+  )
+
+  const resourceFlags = {
+    exportFlows: false,
+    exportConnectors: false,
+    exportModels: false,
+    exportTemplates: false,
+    exportWebhooks: false,
+    exportWidgets: false
+  }
+
+  if (resourcesList.includes('ALL')) {
+    for (const flag in resourceFlags) {
+      if (Object.prototype.hasOwnProperty.call(resourceFlags, flag)) {
+        resourceFlags[flag] = true
+      }
+    }
+  } else {
+    // eslint-disable-next-line github/array-foreach
+    resourcesList.forEach(resource => {
+      switch (resource) {
+        case 'FLOW':
+          resourceFlags.exportFlows = true
+          break
+        case 'CONNECTOR':
+          resourceFlags.exportConnectors = true
+          break
+        case 'MODEL':
+          resourceFlags.exportModels = true
+          break
+        case 'TEMPLATE':
+          resourceFlags.exportTemplates = true
+          break
+        case 'WEBHOOK':
+          resourceFlags.exportWebhooks = true
+          break
+        case 'WIDGET':
+          resourceFlags.exportWidgets = true
+          break
+        default:
+          break
+      }
+    })
+  }
+
+  return resourceFlags
+}
+
+function splitString(input) {
+  if (input) return input.split(',').map(item => item.trim())
+
+  return []
+}
+
+function getGraphQlReqConfigs(domain, authToken, projectId, data) {
+  return {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: `https://api.${domain}/graphql`,
+    headers: {
+      authorization: `Bearer ${authToken}`,
+      'content-type': 'application/json',
+      'fastn-space-id': projectId,
+      realm: 'fastn'
+    },
+    data
+  }
+}
+
+module.exports = {
+  splitString,
+  parseResourcesToExport,
+  getGraphQlReqConfigs
 }
 
 
@@ -9130,7 +9693,7 @@ module.exports = require("zlib");
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
-// Axios v1.7.2 Copyright (c) 2024 Matt Zabriskie and contributors
+// Axios v1.7.7 Copyright (c) 2024 Matt Zabriskie and contributors
 
 
 const FormData$1 = __nccwpck_require__(4334);
@@ -9828,6 +10391,36 @@ const isAsyncFn = kindOfTest('AsyncFunction');
 const isThenable = (thing) =>
   thing && (isObject(thing) || isFunction(thing)) && isFunction(thing.then) && isFunction(thing.catch);
 
+// original code
+// https://github.com/DigitalBrainJS/AxiosPromise/blob/16deab13710ec09779922131f3fa5954320f83ab/lib/utils.js#L11-L34
+
+const _setImmediate = ((setImmediateSupported, postMessageSupported) => {
+  if (setImmediateSupported) {
+    return setImmediate;
+  }
+
+  return postMessageSupported ? ((token, callbacks) => {
+    _global.addEventListener("message", ({source, data}) => {
+      if (source === _global && data === token) {
+        callbacks.length && callbacks.shift()();
+      }
+    }, false);
+
+    return (cb) => {
+      callbacks.push(cb);
+      _global.postMessage(token, "*");
+    }
+  })(`axios@${Math.random()}`, []) : (cb) => setTimeout(cb);
+})(
+  typeof setImmediate === 'function',
+  isFunction(_global.postMessage)
+);
+
+const asap = typeof queueMicrotask !== 'undefined' ?
+  queueMicrotask.bind(_global) : ( typeof process !== 'undefined' && process.nextTick || _setImmediate);
+
+// *********************
+
 const utils$1 = {
   isArray,
   isArrayBuffer,
@@ -9883,7 +10476,9 @@ const utils$1 = {
   isSpecCompliantForm,
   toJSONObject,
   isAsyncFn,
-  isThenable
+  isThenable,
+  setImmediate: _setImmediate,
+  asap
 };
 
 /**
@@ -9911,7 +10506,10 @@ function AxiosError(message, code, config, request, response) {
   code && (this.code = code);
   config && (this.config = config);
   request && (this.request = request);
-  response && (this.response = response);
+  if (response) {
+    this.response = response;
+    this.status = response.status ? response.status : null;
+  }
 }
 
 utils$1.inherits(AxiosError, Error, {
@@ -9931,7 +10529,7 @@ utils$1.inherits(AxiosError, Error, {
       // Axios
       config: utils$1.toJSONObject(this.config),
       code: this.code,
-      status: this.response && this.response.status ? this.response.status : null
+      status: this.status
     };
   }
 });
@@ -10392,6 +10990,8 @@ const platform$1 = {
 
 const hasBrowserEnv = typeof window !== 'undefined' && typeof document !== 'undefined';
 
+const _navigator = typeof navigator === 'object' && navigator || undefined;
+
 /**
  * Determine if we're running in a standard browser environment
  *
@@ -10409,10 +11009,8 @@ const hasBrowserEnv = typeof window !== 'undefined' && typeof document !== 'unde
  *
  * @returns {boolean}
  */
-const hasStandardBrowserEnv = (
-  (product) => {
-    return hasBrowserEnv && ['ReactNative', 'NativeScript', 'NS'].indexOf(product) < 0
-  })(typeof navigator !== 'undefined' && navigator.product);
+const hasStandardBrowserEnv = hasBrowserEnv &&
+  (!_navigator || ['ReactNative', 'NativeScript', 'NS'].indexOf(_navigator.product) < 0);
 
 /**
  * Determine if we're running in a standard browser webWorker environment
@@ -10439,6 +11037,7 @@ const utils = /*#__PURE__*/Object.freeze({
   hasBrowserEnv: hasBrowserEnv,
   hasStandardBrowserWebWorkerEnv: hasStandardBrowserWebWorkerEnv,
   hasStandardBrowserEnv: hasStandardBrowserEnv,
+  navigator: _navigator,
   origin: origin
 });
 
@@ -11167,7 +11766,7 @@ function buildFullPath(baseURL, requestedURL) {
   return requestedURL;
 }
 
-const VERSION = "1.7.2";
+const VERSION = "1.7.7";
 
 function parseProtocol(url) {
   const match = /^([-+\w]{1,25})(:?\/\/|:)/.exec(url);
@@ -11222,90 +11821,6 @@ function fromDataURI(uri, asBlob, options) {
   throw new AxiosError('Unsupported protocol ' + protocol, AxiosError.ERR_NOT_SUPPORT);
 }
 
-/**
- * Throttle decorator
- * @param {Function} fn
- * @param {Number} freq
- * @return {Function}
- */
-function throttle(fn, freq) {
-  let timestamp = 0;
-  const threshold = 1000 / freq;
-  let timer = null;
-  return function throttled() {
-    const force = this === true;
-
-    const now = Date.now();
-    if (force || now - timestamp > threshold) {
-      if (timer) {
-        clearTimeout(timer);
-        timer = null;
-      }
-      timestamp = now;
-      return fn.apply(null, arguments);
-    }
-    if (!timer) {
-      timer = setTimeout(() => {
-        timer = null;
-        timestamp = Date.now();
-        return fn.apply(null, arguments);
-      }, threshold - (now - timestamp));
-    }
-  };
-}
-
-/**
- * Calculate data maxRate
- * @param {Number} [samplesCount= 10]
- * @param {Number} [min= 1000]
- * @returns {Function}
- */
-function speedometer(samplesCount, min) {
-  samplesCount = samplesCount || 10;
-  const bytes = new Array(samplesCount);
-  const timestamps = new Array(samplesCount);
-  let head = 0;
-  let tail = 0;
-  let firstSampleTS;
-
-  min = min !== undefined ? min : 1000;
-
-  return function push(chunkLength) {
-    const now = Date.now();
-
-    const startedAt = timestamps[tail];
-
-    if (!firstSampleTS) {
-      firstSampleTS = now;
-    }
-
-    bytes[head] = chunkLength;
-    timestamps[head] = now;
-
-    let i = tail;
-    let bytesCount = 0;
-
-    while (i !== head) {
-      bytesCount += bytes[i++];
-      i = i % samplesCount;
-    }
-
-    head = (head + 1) % samplesCount;
-
-    if (head === tail) {
-      tail = (tail + 1) % samplesCount;
-    }
-
-    if (now - firstSampleTS < min) {
-      return;
-    }
-
-    const passed = startedAt && now - startedAt;
-
-    return passed ? Math.round(bytesCount * 1000 / passed) : undefined;
-  };
-}
-
 const kInternals = Symbol('internals');
 
 class AxiosTransformStream extends stream__default["default"].Transform{
@@ -11325,12 +11840,8 @@ class AxiosTransformStream extends stream__default["default"].Transform{
       readableHighWaterMark: options.chunkSize
     });
 
-    const self = this;
-
     const internals = this[kInternals] = {
-      length: options.length,
       timeWindow: options.timeWindow,
-      ticksRate: options.ticksRate,
       chunkSize: options.chunkSize,
       maxRate: options.maxRate,
       minChunkSize: options.minChunkSize,
@@ -11342,8 +11853,6 @@ class AxiosTransformStream extends stream__default["default"].Transform{
       onReadCallback: null
     };
 
-    const _speedometer = speedometer(internals.ticksRate * options.samplesCount, internals.timeWindow);
-
     this.on('newListener', event => {
       if (event === 'progress') {
         if (!internals.isCaptured) {
@@ -11351,39 +11860,6 @@ class AxiosTransformStream extends stream__default["default"].Transform{
         }
       }
     });
-
-    let bytesNotified = 0;
-
-    internals.updateProgress = throttle(function throttledHandler() {
-      const totalBytes = internals.length;
-      const bytesTransferred = internals.bytesSeen;
-      const progressBytes = bytesTransferred - bytesNotified;
-      if (!progressBytes || self.destroyed) return;
-
-      const rate = _speedometer(progressBytes);
-
-      bytesNotified = bytesTransferred;
-
-      process.nextTick(() => {
-        self.emit('progress', {
-          loaded: bytesTransferred,
-          total: totalBytes,
-          progress: totalBytes ? (bytesTransferred / totalBytes) : undefined,
-          bytes: progressBytes,
-          rate: rate ? rate : undefined,
-          estimated: rate && totalBytes && bytesTransferred <= totalBytes ?
-            (totalBytes - bytesTransferred) / rate : undefined,
-          lengthComputable: totalBytes != null
-        });
-      });
-    }, internals.ticksRate);
-
-    const onFinish = () => {
-      internals.updateProgress.call(true);
-    };
-
-    this.once('end', onFinish);
-    this.once('error', onFinish);
   }
 
   _read(size) {
@@ -11397,7 +11873,6 @@ class AxiosTransformStream extends stream__default["default"].Transform{
   }
 
   _transform(chunk, encoding, callback) {
-    const self = this;
     const internals = this[kInternals];
     const maxRate = internals.maxRate;
 
@@ -11409,16 +11884,14 @@ class AxiosTransformStream extends stream__default["default"].Transform{
     const bytesThreshold = (maxRate / divider);
     const minChunkSize = internals.minChunkSize !== false ? Math.max(internals.minChunkSize, bytesThreshold * 0.01) : 0;
 
-    function pushChunk(_chunk, _callback) {
+    const pushChunk = (_chunk, _callback) => {
       const bytes = Buffer.byteLength(_chunk);
       internals.bytesSeen += bytes;
       internals.bytes += bytes;
 
-      if (internals.isCaptured) {
-        internals.updateProgress();
-      }
+      internals.isCaptured && this.emit('progress', internals.bytesSeen);
 
-      if (self.push(_chunk)) {
+      if (this.push(_chunk)) {
         process.nextTick(_callback);
       } else {
         internals.onReadCallback = () => {
@@ -11426,7 +11899,7 @@ class AxiosTransformStream extends stream__default["default"].Transform{
           process.nextTick(_callback);
         };
       }
-    }
+    };
 
     const transformChunk = (_chunk, _callback) => {
       const chunkSize = Buffer.byteLength(_chunk);
@@ -11482,11 +11955,6 @@ class AxiosTransformStream extends stream__default["default"].Transform{
         callback(null);
       }
     });
-  }
-
-  setLength(length) {
-    this[kInternals].length = +length;
-    return this;
   }
 }
 
@@ -11655,6 +12123,142 @@ const callbackify = (fn, reducer) => {
 
 const callbackify$1 = callbackify;
 
+/**
+ * Calculate data maxRate
+ * @param {Number} [samplesCount= 10]
+ * @param {Number} [min= 1000]
+ * @returns {Function}
+ */
+function speedometer(samplesCount, min) {
+  samplesCount = samplesCount || 10;
+  const bytes = new Array(samplesCount);
+  const timestamps = new Array(samplesCount);
+  let head = 0;
+  let tail = 0;
+  let firstSampleTS;
+
+  min = min !== undefined ? min : 1000;
+
+  return function push(chunkLength) {
+    const now = Date.now();
+
+    const startedAt = timestamps[tail];
+
+    if (!firstSampleTS) {
+      firstSampleTS = now;
+    }
+
+    bytes[head] = chunkLength;
+    timestamps[head] = now;
+
+    let i = tail;
+    let bytesCount = 0;
+
+    while (i !== head) {
+      bytesCount += bytes[i++];
+      i = i % samplesCount;
+    }
+
+    head = (head + 1) % samplesCount;
+
+    if (head === tail) {
+      tail = (tail + 1) % samplesCount;
+    }
+
+    if (now - firstSampleTS < min) {
+      return;
+    }
+
+    const passed = startedAt && now - startedAt;
+
+    return passed ? Math.round(bytesCount * 1000 / passed) : undefined;
+  };
+}
+
+/**
+ * Throttle decorator
+ * @param {Function} fn
+ * @param {Number} freq
+ * @return {Function}
+ */
+function throttle(fn, freq) {
+  let timestamp = 0;
+  let threshold = 1000 / freq;
+  let lastArgs;
+  let timer;
+
+  const invoke = (args, now = Date.now()) => {
+    timestamp = now;
+    lastArgs = null;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    fn.apply(null, args);
+  };
+
+  const throttled = (...args) => {
+    const now = Date.now();
+    const passed = now - timestamp;
+    if ( passed >= threshold) {
+      invoke(args, now);
+    } else {
+      lastArgs = args;
+      if (!timer) {
+        timer = setTimeout(() => {
+          timer = null;
+          invoke(lastArgs);
+        }, threshold - passed);
+      }
+    }
+  };
+
+  const flush = () => lastArgs && invoke(lastArgs);
+
+  return [throttled, flush];
+}
+
+const progressEventReducer = (listener, isDownloadStream, freq = 3) => {
+  let bytesNotified = 0;
+  const _speedometer = speedometer(50, 250);
+
+  return throttle(e => {
+    const loaded = e.loaded;
+    const total = e.lengthComputable ? e.total : undefined;
+    const progressBytes = loaded - bytesNotified;
+    const rate = _speedometer(progressBytes);
+    const inRange = loaded <= total;
+
+    bytesNotified = loaded;
+
+    const data = {
+      loaded,
+      total,
+      progress: total ? (loaded / total) : undefined,
+      bytes: progressBytes,
+      rate: rate ? rate : undefined,
+      estimated: rate && total && inRange ? (total - loaded) / rate : undefined,
+      event: e,
+      lengthComputable: total != null,
+      [isDownloadStream ? 'download' : 'upload']: true
+    };
+
+    listener(data);
+  }, freq);
+};
+
+const progressEventDecorator = (total, throttled) => {
+  const lengthComputable = total != null;
+
+  return [(loaded) => throttled[0]({
+    lengthComputable,
+    total,
+    loaded
+  }), throttled[1]];
+};
+
+const asyncDecorator = (fn) => (...args) => utils$1.asap(() => fn(...args));
+
 const zlibOptions = {
   flush: zlib__default["default"].constants.Z_SYNC_FLUSH,
   finishFlush: zlib__default["default"].constants.Z_SYNC_FLUSH
@@ -11674,6 +12278,14 @@ const isHttps = /https:?/;
 const supportedProtocols = platform.protocols.map(protocol => {
   return protocol + ':';
 });
+
+const flushOnFinish = (stream, [throttled, flush]) => {
+  stream
+    .on('end', flush)
+    .on('error', flush);
+
+  return throttled;
+};
 
 /**
  * If the proxy or config beforeRedirects functions are defined, call them with the options
@@ -11850,7 +12462,7 @@ const httpAdapter = isHttpAdapterSupported && function httpAdapter(config) {
 
     // Parse url
     const fullPath = buildFullPath(config.baseURL, config.url);
-    const parsed = new URL(fullPath, 'http://localhost');
+    const parsed = new URL(fullPath, platform.hasBrowserEnv ? platform.origin : undefined);
     const protocol = parsed.protocol || supportedProtocols[0];
 
     if (protocol === 'data:') {
@@ -11908,8 +12520,7 @@ const httpAdapter = isHttpAdapterSupported && function httpAdapter(config) {
     // Only set header if it hasn't been set in config
     headers.set('User-Agent', 'axios/' + VERSION, false);
 
-    const onDownloadProgress = config.onDownloadProgress;
-    const onUploadProgress = config.onUploadProgress;
+    const {onUploadProgress, onDownloadProgress} = config;
     const maxRate = config.maxRate;
     let maxUploadRate = undefined;
     let maxDownloadRate = undefined;
@@ -11980,15 +12591,16 @@ const httpAdapter = isHttpAdapterSupported && function httpAdapter(config) {
       }
 
       data = stream__default["default"].pipeline([data, new AxiosTransformStream$1({
-        length: contentLength,
         maxRate: utils$1.toFiniteNumber(maxUploadRate)
       })], utils$1.noop);
 
-      onUploadProgress && data.on('progress', progress => {
-        onUploadProgress(Object.assign(progress, {
-          upload: true
-        }));
-      });
+      onUploadProgress && data.on('progress', flushOnFinish(
+        data,
+        progressEventDecorator(
+          contentLength,
+          progressEventReducer(asyncDecorator(onUploadProgress), false, 3)
+        )
+      ));
     }
 
     // HTTP basic authentication
@@ -12046,7 +12658,7 @@ const httpAdapter = isHttpAdapterSupported && function httpAdapter(config) {
     if (config.socketPath) {
       options.socketPath = config.socketPath;
     } else {
-      options.hostname = parsed.hostname;
+      options.hostname = parsed.hostname.startsWith("[") ? parsed.hostname.slice(1, -1) : parsed.hostname;
       options.port = parsed.port;
       setProxy(options, config.proxy, protocol + '//' + parsed.hostname + (parsed.port ? ':' + parsed.port : '') + options.path);
     }
@@ -12087,17 +12699,18 @@ const httpAdapter = isHttpAdapterSupported && function httpAdapter(config) {
 
       const responseLength = +res.headers['content-length'];
 
-      if (onDownloadProgress) {
+      if (onDownloadProgress || maxDownloadRate) {
         const transformStream = new AxiosTransformStream$1({
-          length: utils$1.toFiniteNumber(responseLength),
           maxRate: utils$1.toFiniteNumber(maxDownloadRate)
         });
 
-        onDownloadProgress && transformStream.on('progress', progress => {
-          onDownloadProgress(Object.assign(progress, {
-            download: true
-          }));
-        });
+        onDownloadProgress && transformStream.on('progress', flushOnFinish(
+          transformStream,
+          progressEventDecorator(
+            responseLength,
+            progressEventReducer(asyncDecorator(onDownloadProgress), true, 3)
+          )
+        ));
 
         streams.push(transformStream);
       }
@@ -12310,42 +12923,12 @@ const httpAdapter = isHttpAdapterSupported && function httpAdapter(config) {
   });
 };
 
-const progressEventReducer = (listener, isDownloadStream, freq = 3) => {
-  let bytesNotified = 0;
-  const _speedometer = speedometer(50, 250);
-
-  return throttle(e => {
-    const loaded = e.loaded;
-    const total = e.lengthComputable ? e.total : undefined;
-    const progressBytes = loaded - bytesNotified;
-    const rate = _speedometer(progressBytes);
-    const inRange = loaded <= total;
-
-    bytesNotified = loaded;
-
-    const data = {
-      loaded,
-      total,
-      progress: total ? (loaded / total) : undefined,
-      bytes: progressBytes,
-      rate: rate ? rate : undefined,
-      estimated: rate && total && inRange ? (total - loaded) / rate : undefined,
-      event: e,
-      lengthComputable: total != null
-    };
-
-    data[isDownloadStream ? 'download' : 'upload'] = true;
-
-    listener(data);
-  }, freq);
-};
-
 const isURLSameOrigin = platform.hasStandardBrowserEnv ?
 
 // Standard browser envs have full support of the APIs needed to test
 // whether the request URL is of the same origin as current location.
   (function standardBrowserEnv() {
-    const msie = /(msie|trident)/i.test(navigator.userAgent);
+    const msie = platform.navigator && /(msie|trident)/i.test(platform.navigator.userAgent);
     const urlParsingNode = document.createElement('a');
     let originURL;
 
@@ -12599,16 +13182,18 @@ const xhrAdapter = isXHRAdapterSupported && function (config) {
     const _config = resolveConfig(config);
     let requestData = _config.data;
     const requestHeaders = AxiosHeaders$1.from(_config.headers).normalize();
-    let {responseType} = _config;
+    let {responseType, onUploadProgress, onDownloadProgress} = _config;
     let onCanceled;
-    function done() {
-      if (_config.cancelToken) {
-        _config.cancelToken.unsubscribe(onCanceled);
-      }
+    let uploadThrottled, downloadThrottled;
+    let flushUpload, flushDownload;
 
-      if (_config.signal) {
-        _config.signal.removeEventListener('abort', onCanceled);
-      }
+    function done() {
+      flushUpload && flushUpload(); // flush events
+      flushDownload && flushDownload(); // flush events
+
+      _config.cancelToken && _config.cancelToken.unsubscribe(onCanceled);
+
+      _config.signal && _config.signal.removeEventListener('abort', onCanceled);
     }
 
     let request = new XMLHttpRequest();
@@ -12678,7 +13263,7 @@ const xhrAdapter = isXHRAdapterSupported && function (config) {
         return;
       }
 
-      reject(new AxiosError('Request aborted', AxiosError.ECONNABORTED, _config, request));
+      reject(new AxiosError('Request aborted', AxiosError.ECONNABORTED, config, request));
 
       // Clean up request
       request = null;
@@ -12688,7 +13273,7 @@ const xhrAdapter = isXHRAdapterSupported && function (config) {
     request.onerror = function handleError() {
       // Real errors are hidden from us by the browser
       // onerror should only fire if it's a network error
-      reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, _config, request));
+      reject(new AxiosError('Network Error', AxiosError.ERR_NETWORK, config, request));
 
       // Clean up request
       request = null;
@@ -12704,7 +13289,7 @@ const xhrAdapter = isXHRAdapterSupported && function (config) {
       reject(new AxiosError(
         timeoutErrorMessage,
         transitional.clarifyTimeoutError ? AxiosError.ETIMEDOUT : AxiosError.ECONNABORTED,
-        _config,
+        config,
         request));
 
       // Clean up request
@@ -12732,13 +13317,18 @@ const xhrAdapter = isXHRAdapterSupported && function (config) {
     }
 
     // Handle progress if needed
-    if (typeof _config.onDownloadProgress === 'function') {
-      request.addEventListener('progress', progressEventReducer(_config.onDownloadProgress, true));
+    if (onDownloadProgress) {
+      ([downloadThrottled, flushDownload] = progressEventReducer(onDownloadProgress, true));
+      request.addEventListener('progress', downloadThrottled);
     }
 
     // Not all browsers support upload events
-    if (typeof _config.onUploadProgress === 'function' && request.upload) {
-      request.upload.addEventListener('progress', progressEventReducer(_config.onUploadProgress));
+    if (onUploadProgress && request.upload) {
+      ([uploadThrottled, flushUpload] = progressEventReducer(onUploadProgress));
+
+      request.upload.addEventListener('progress', uploadThrottled);
+
+      request.upload.addEventListener('loadend', flushUpload);
     }
 
     if (_config.cancelToken || _config.signal) {
@@ -12773,45 +13363,46 @@ const xhrAdapter = isXHRAdapterSupported && function (config) {
 };
 
 const composeSignals = (signals, timeout) => {
-  let controller = new AbortController();
+  const {length} = (signals = signals ? signals.filter(Boolean) : []);
 
-  let aborted;
+  if (timeout || length) {
+    let controller = new AbortController();
 
-  const onabort = function (cancel) {
-    if (!aborted) {
-      aborted = true;
-      unsubscribe();
-      const err = cancel instanceof Error ? cancel : this.reason;
-      controller.abort(err instanceof AxiosError ? err : new CanceledError(err instanceof Error ? err.message : err));
-    }
-  };
+    let aborted;
 
-  let timer = timeout && setTimeout(() => {
-    onabort(new AxiosError(`timeout ${timeout} of ms exceeded`, AxiosError.ETIMEDOUT));
-  }, timeout);
+    const onabort = function (reason) {
+      if (!aborted) {
+        aborted = true;
+        unsubscribe();
+        const err = reason instanceof Error ? reason : this.reason;
+        controller.abort(err instanceof AxiosError ? err : new CanceledError(err instanceof Error ? err.message : err));
+      }
+    };
 
-  const unsubscribe = () => {
-    if (signals) {
-      timer && clearTimeout(timer);
+    let timer = timeout && setTimeout(() => {
       timer = null;
-      signals.forEach(signal => {
-        signal &&
-        (signal.removeEventListener ? signal.removeEventListener('abort', onabort) : signal.unsubscribe(onabort));
-      });
-      signals = null;
-    }
-  };
+      onabort(new AxiosError(`timeout ${timeout} of ms exceeded`, AxiosError.ETIMEDOUT));
+    }, timeout);
 
-  signals.forEach((signal) => signal && signal.addEventListener && signal.addEventListener('abort', onabort));
+    const unsubscribe = () => {
+      if (signals) {
+        timer && clearTimeout(timer);
+        timer = null;
+        signals.forEach(signal => {
+          signal.unsubscribe ? signal.unsubscribe(onabort) : signal.removeEventListener('abort', onabort);
+        });
+        signals = null;
+      }
+    };
 
-  const {signal} = controller;
+    signals.forEach((signal) => signal.addEventListener('abort', onabort));
 
-  signal.unsubscribe = unsubscribe;
+    const {signal} = controller;
 
-  return [signal, () => {
-    timer && clearTimeout(timer);
-    timer = null;
-  }];
+    signal.unsubscribe = () => utils$1.asap(unsubscribe);
+
+    return signal;
+  }
 };
 
 const composeSignals$1 = composeSignals;
@@ -12834,49 +13425,73 @@ const streamChunk = function* (chunk, chunkSize) {
   }
 };
 
-const readBytes = async function* (iterable, chunkSize, encode) {
-  for await (const chunk of iterable) {
-    yield* streamChunk(ArrayBuffer.isView(chunk) ? chunk : (await encode(String(chunk))), chunkSize);
+const readBytes = async function* (iterable, chunkSize) {
+  for await (const chunk of readStream(iterable)) {
+    yield* streamChunk(chunk, chunkSize);
   }
 };
 
-const trackStream = (stream, chunkSize, onProgress, onFinish, encode) => {
-  const iterator = readBytes(stream, chunkSize, encode);
+const readStream = async function* (stream) {
+  if (stream[Symbol.asyncIterator]) {
+    yield* stream;
+    return;
+  }
+
+  const reader = stream.getReader();
+  try {
+    for (;;) {
+      const {done, value} = await reader.read();
+      if (done) {
+        break;
+      }
+      yield value;
+    }
+  } finally {
+    await reader.cancel();
+  }
+};
+
+const trackStream = (stream, chunkSize, onProgress, onFinish) => {
+  const iterator = readBytes(stream, chunkSize);
 
   let bytes = 0;
+  let done;
+  let _onFinish = (e) => {
+    if (!done) {
+      done = true;
+      onFinish && onFinish(e);
+    }
+  };
 
   return new ReadableStream({
-    type: 'bytes',
-
     async pull(controller) {
-      const {done, value} = await iterator.next();
+      try {
+        const {done, value} = await iterator.next();
 
-      if (done) {
-        controller.close();
-        onFinish();
-        return;
+        if (done) {
+         _onFinish();
+          controller.close();
+          return;
+        }
+
+        let len = value.byteLength;
+        if (onProgress) {
+          let loadedBytes = bytes += len;
+          onProgress(loadedBytes);
+        }
+        controller.enqueue(new Uint8Array(value));
+      } catch (err) {
+        _onFinish(err);
+        throw err;
       }
-
-      let len = value.byteLength;
-      onProgress && onProgress(bytes += len);
-      controller.enqueue(new Uint8Array(value));
     },
     cancel(reason) {
-      onFinish(reason);
+      _onFinish(reason);
       return iterator.return();
     }
   }, {
     highWaterMark: 2
   })
-};
-
-const fetchProgressDecorator = (total, fn) => {
-  const lengthComputable = total != null;
-  return (loaded) => setTimeout(() => fn({
-    lengthComputable,
-    total,
-    loaded
-  }));
 };
 
 const isFetchSupported = typeof fetch === 'function' && typeof Request === 'function' && typeof Response === 'function';
@@ -12888,7 +13503,15 @@ const encodeText = isFetchSupported && (typeof TextEncoder === 'function' ?
     async (str) => new Uint8Array(await new Response(str).arrayBuffer())
 );
 
-const supportsRequestStream = isReadableStreamSupported && (() => {
+const test = (fn, ...args) => {
+  try {
+    return !!fn(...args);
+  } catch (e) {
+    return false
+  }
+};
+
+const supportsRequestStream = isReadableStreamSupported && test(() => {
   let duplexAccessed = false;
 
   const hasContentType = new Request(platform.origin, {
@@ -12901,17 +13524,13 @@ const supportsRequestStream = isReadableStreamSupported && (() => {
   }).headers.has('Content-Type');
 
   return duplexAccessed && !hasContentType;
-})();
+});
 
 const DEFAULT_CHUNK_SIZE = 64 * 1024;
 
-const supportsResponseStream = isReadableStreamSupported && !!(()=> {
-  try {
-    return utils$1.isReadableStream(new Response('').body);
-  } catch(err) {
-    // return undefined
-  }
-})();
+const supportsResponseStream = isReadableStreamSupported &&
+  test(() => utils$1.isReadableStream(new Response('').body));
+
 
 const resolvers = {
   stream: supportsResponseStream && ((res) => res.body)
@@ -12936,10 +13555,14 @@ const getBodyLength = async (body) => {
   }
 
   if(utils$1.isSpecCompliantForm(body)) {
-    return (await new Request(body).arrayBuffer()).byteLength;
+    const _request = new Request(platform.origin, {
+      method: 'POST',
+      body,
+    });
+    return (await _request.arrayBuffer()).byteLength;
   }
 
-  if(utils$1.isArrayBufferView(body)) {
+  if(utils$1.isArrayBufferView(body) || utils$1.isArrayBuffer(body)) {
     return body.byteLength;
   }
 
@@ -12976,18 +13599,13 @@ const fetchAdapter = isFetchSupported && (async (config) => {
 
   responseType = responseType ? (responseType + '').toLowerCase() : 'text';
 
-  let [composedSignal, stopTimeout] = (signal || cancelToken || timeout) ?
-    composeSignals$1([signal, cancelToken], timeout) : [];
+  let composedSignal = composeSignals$1([signal, cancelToken && cancelToken.toAbortSignal()], timeout);
 
-  let finished, request;
+  let request;
 
-  const onFinish = () => {
-    !finished && setTimeout(() => {
-      composedSignal && composedSignal.unsubscribe();
-    });
-
-    finished = true;
-  };
+  const unsubscribe = composedSignal && composedSignal.unsubscribe && (() => {
+      composedSignal.unsubscribe();
+  });
 
   let requestContentLength;
 
@@ -13009,17 +13627,22 @@ const fetchAdapter = isFetchSupported && (async (config) => {
       }
 
       if (_request.body) {
-        data = trackStream(_request.body, DEFAULT_CHUNK_SIZE, fetchProgressDecorator(
+        const [onProgress, flush] = progressEventDecorator(
           requestContentLength,
-          progressEventReducer(onUploadProgress)
-        ), null, encodeText);
+          progressEventReducer(asyncDecorator(onUploadProgress))
+        );
+
+        data = trackStream(_request.body, DEFAULT_CHUNK_SIZE, onProgress, flush);
       }
     }
 
     if (!utils$1.isString(withCredentials)) {
-      withCredentials = withCredentials ? 'cors' : 'omit';
+      withCredentials = withCredentials ? 'include' : 'omit';
     }
 
+    // Cloudflare Workers throws when credentials are defined
+    // see https://github.com/cloudflare/workerd/issues/902
+    const isCredentialsSupported = "credentials" in Request.prototype;
     request = new Request(url, {
       ...fetchOptions,
       signal: composedSignal,
@@ -13027,14 +13650,14 @@ const fetchAdapter = isFetchSupported && (async (config) => {
       headers: headers.normalize().toJSON(),
       body: data,
       duplex: "half",
-      withCredentials
+      credentials: isCredentialsSupported ? withCredentials : undefined
     });
 
     let response = await fetch(request);
 
     const isStreamResponse = supportsResponseStream && (responseType === 'stream' || responseType === 'response');
 
-    if (supportsResponseStream && (onDownloadProgress || isStreamResponse)) {
+    if (supportsResponseStream && (onDownloadProgress || (isStreamResponse && unsubscribe))) {
       const options = {};
 
       ['status', 'statusText', 'headers'].forEach(prop => {
@@ -13043,11 +13666,16 @@ const fetchAdapter = isFetchSupported && (async (config) => {
 
       const responseContentLength = utils$1.toFiniteNumber(response.headers.get('content-length'));
 
+      const [onProgress, flush] = onDownloadProgress && progressEventDecorator(
+        responseContentLength,
+        progressEventReducer(asyncDecorator(onDownloadProgress), true)
+      ) || [];
+
       response = new Response(
-        trackStream(response.body, DEFAULT_CHUNK_SIZE, onDownloadProgress && fetchProgressDecorator(
-          responseContentLength,
-          progressEventReducer(onDownloadProgress, true)
-        ), isStreamResponse && onFinish, encodeText),
+        trackStream(response.body, DEFAULT_CHUNK_SIZE, onProgress, () => {
+          flush && flush();
+          unsubscribe && unsubscribe();
+        }),
         options
       );
     }
@@ -13056,9 +13684,7 @@ const fetchAdapter = isFetchSupported && (async (config) => {
 
     let responseData = await resolvers[utils$1.findKey(resolvers, responseType) || 'text'](response, config);
 
-    !isStreamResponse && onFinish();
-
-    stopTimeout && stopTimeout();
+    !isStreamResponse && unsubscribe && unsubscribe();
 
     return await new Promise((resolve, reject) => {
       settle(resolve, reject, {
@@ -13071,7 +13697,7 @@ const fetchAdapter = isFetchSupported && (async (config) => {
       });
     })
   } catch (err) {
-    onFinish();
+    unsubscribe && unsubscribe();
 
     if (err && err.name === 'TypeError' && /fetch/i.test(err.message)) {
       throw Object.assign(
@@ -13636,6 +14262,20 @@ class CancelToken {
     if (index !== -1) {
       this._listeners.splice(index, 1);
     }
+  }
+
+  toAbortSignal() {
+    const controller = new AbortController();
+
+    const abort = (err) => {
+      controller.abort(err);
+    };
+
+    this.subscribe(abort);
+
+    controller.signal.unsubscribe = () => this.unsubscribe(abort);
+
+    return controller.signal;
   }
 
   /**
