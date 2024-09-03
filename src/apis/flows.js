@@ -1,95 +1,46 @@
 const core = require('@actions/core')
 const axios = require('axios')
 const qs = require('qs')
+const { getGraphQlReqConfigs } = require('../utilities/helpers')
 
-async function fetchApiFlow(authToken, projectId, apiName, domain) {
+async function exportApis(authToken, projectId, domain, stage, ids) {
   const data = JSON.stringify({
-    query: `query exportApi($input: GetEntityInput) {
-    exportApi(input: $input) 
-  }`,
-    variables: { input: { clientId: projectId, id: apiName } }
-  })
-
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
-
-  try {
-    const response = await axios.request(config)
-    return response.data.data.exportApi
-  } catch (error) {
-    core.debug(`Unable to fetch flow ${apiName}. Error: ${error}`)
-  }
-}
-
-async function fetchApiFlowsByStage(authToken, projectId, domain, stage) {
-  const data = JSON.stringify({
-    query: `query exportDeployedApis($input: ExportDeployedApisInput) {
-      exportDeployedApis(input: $input) 
+    query: `query exportApis($input: ExportApisInput) {
+      exportApis(input: $input) 
     }`,
-    variables: { input: { projectId, stage } }
+    variables: { input: { projectId, stage, ids } }
   })
 
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
     const response = await axios.request(config)
-    return response.data.data.exportDeployedApis.map(apiData => {
-      return { api: apiData }
-    })
+    core.debug(`${JSON.stringify(config)}`)
+    core.debug(`${JSON.stringify(ids)}`)
+    core.debug(
+      `Fetched flows: ${JSON.stringify(response.data.data.exportApis)} from ${projectId} and stage ${stage} on ${domain}`
+    )
+    return response.data.data.exportApis
   } catch (error) {
     core.debug(`Unable to fetch flows. Error: ${error}`)
   }
 }
 
-async function importApiFlow(authToken, projectId, apiName, apiData, domain) {
+async function importApis(authToken, projectId, apis, stage, domain) {
   const data = JSON.stringify({
-    query: `mutation importApi($input: ImportApiInput!) {
-      importApi(input: $input) {
-        __typename
-      }
+    query: `mutation importApis($input: ImportApisInput) {
+      importApis(input: $input) 
     }`,
-    variables: { input: { clientId: projectId, name: apiName, data: apiData } }
+    variables: { input: { projectId, apis, stage } }
   })
 
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import flow ${apiName}. Error: ${error}`)
+    core.debug(`Unable to import flows. Error: ${error}`)
   }
 }
 
@@ -131,8 +82,7 @@ async function deployApiFlowToStage(
 }
 
 module.exports = {
-  fetchApiFlow,
-  fetchApiFlowsByStage,
-  importApiFlow,
+  exportApis,
+  importApis,
   deployApiFlowToStage
 }

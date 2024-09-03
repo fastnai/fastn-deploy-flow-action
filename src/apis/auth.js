@@ -2,7 +2,7 @@ const core = require('@actions/core')
 const axios = require('axios')
 const qs = require('qs')
 
-async function fetchAuthToken(username, password, env) {
+async function fetchAuthToken(username, password, domain) {
   const data = qs.stringify({
     grant_type: 'password',
     username,
@@ -14,7 +14,7 @@ async function fetchAuthToken(username, password, env) {
   const config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: `https://auth.${env}/realms/fastn/protocol/openid-connect/token`,
+    url: `https://auth.${domain}/realms/fastn/protocol/openid-connect/token`,
     headers: {
       realm: 'fastn',
       'Content-Type': 'application/x-www-form-urlencoded'
@@ -27,7 +27,7 @@ async function fetchAuthToken(username, password, env) {
     return response.data.access_token
   } catch (error) {
     core.debug(
-      `Unable to retrieve auth token for ${username} in ${env}. Error: ${error}`
+      `Unable to retrieve auth token for ${username} in ${domain}. Error: ${error}`
     )
   }
 }

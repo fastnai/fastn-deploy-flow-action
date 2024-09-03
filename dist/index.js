@@ -8802,7 +8802,7 @@ const core = __nccwpck_require__(2186)
 const axios = __nccwpck_require__(8757)
 const qs = __nccwpck_require__(2760)
 
-async function fetchAuthToken(username, password, env) {
+async function fetchAuthToken(username, password, domain) {
   const data = qs.stringify({
     grant_type: 'password',
     username,
@@ -8814,7 +8814,7 @@ async function fetchAuthToken(username, password, env) {
   const config = {
     method: 'post',
     maxBodyLength: Infinity,
-    url: `https://auth.${env}/realms/fastn/protocol/openid-connect/token`,
+    url: `https://auth.${domain}/realms/fastn/protocol/openid-connect/token`,
     headers: {
       realm: 'fastn',
       'Content-Type': 'application/x-www-form-urlencoded'
@@ -8827,7 +8827,7 @@ async function fetchAuthToken(username, password, env) {
     return response.data.access_token
   } catch (error) {
     core.debug(
-      `Unable to retrieve auth token for ${username} in ${env}. Error: ${error}`
+      `Unable to retrieve auth token for ${username} in ${domain}. Error: ${error}`
     )
   }
 }
@@ -8839,101 +8839,123 @@ module.exports = {
 
 /***/ }),
 
+/***/ 8420:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportConnectors(
+  authToken,
+  projectId,
+  orgId,
+  connectorIds,
+  groupIds,
+  domain
+) {
+  const data = JSON.stringify({
+    query: `query exportConnectors($input: ExportConnectorsGroupInput!) {
+      exportConnectors(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, connectorId: orgId, connectorIds, groupIds }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    core.debug(`${JSON.stringify(config)}`)
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched connectors: ${JSON.stringify(response.data.data.exportConnectors)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportConnectors
+  } catch (error) {
+    core.debug(`Unable to fetch connectors. Error: ${error}`)
+  }
+}
+
+async function importConnectors(
+  authToken,
+  projectId,
+  orgId,
+  connectors,
+  domain
+) {
+  const data = JSON.stringify({
+    query: `mutation importConnectors($input: ImportConnectorsResourcesInput) {
+      importConnectors(input: $input) 
+    }`,
+    variables: { input: { projectId, connectorId: orgId, connectors } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import connectors. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportConnectors,
+  importConnectors
+}
+
+
+/***/ }),
+
 /***/ 1906:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const core = __nccwpck_require__(2186)
 const axios = __nccwpck_require__(8757)
 const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
 
-async function fetchApiFlow(authToken, projectId, apiName, domain) {
+async function exportApis(authToken, projectId, domain, stage, ids) {
   const data = JSON.stringify({
-    query: `query exportApi($input: GetEntityInput) {
-    exportApi(input: $input) 
-  }`,
-    variables: { input: { clientId: projectId, id: apiName } }
-  })
-
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
-
-  try {
-    const response = await axios.request(config)
-    return response.data.data.exportApi
-  } catch (error) {
-    core.debug(`Unable to fetch flow ${apiName}. Error: ${error}`)
-  }
-}
-
-async function fetchApiFlowsByStage(authToken, projectId, domain, stage) {
-  const data = JSON.stringify({
-    query: `query exportDeployedApis($input: ExportDeployedApisInput) {
-      exportDeployedApis(input: $input) 
+    query: `query exportApis($input: ExportApisInput) {
+      exportApis(input: $input) 
     }`,
-    variables: { input: { projectId, stage } }
+    variables: { input: { projectId, stage, ids } }
   })
 
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
     const response = await axios.request(config)
-    return response.data.data.exportDeployedApis.map(apiData => {
-      return { api: apiData }
-    })
+    core.debug(`${JSON.stringify(config)}`)
+    core.debug(`${JSON.stringify(ids)}`)
+    core.debug(
+      `Fetched flows: ${JSON.stringify(response.data.data.exportApis)} from ${projectId} and stage ${stage} on ${domain}`
+    )
+    return response.data.data.exportApis
   } catch (error) {
     core.debug(`Unable to fetch flows. Error: ${error}`)
   }
 }
 
-async function importApiFlow(authToken, projectId, apiName, apiData, domain) {
+async function importApis(authToken, projectId, apis, stage, domain) {
   const data = JSON.stringify({
-    query: `mutation importApi($input: ImportApiInput!) {
-      importApi(input: $input) {
-        __typename
-      }
+    query: `mutation importApis($input: ImportApisInput) {
+      importApis(input: $input) 
     }`,
-    variables: { input: { clientId: projectId, name: apiName, data: apiData } }
+    variables: { input: { projectId, apis, stage } }
   })
 
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import flow ${apiName}. Error: ${error}`)
+    core.debug(`Unable to import flows. Error: ${error}`)
   }
 }
 
@@ -8975,96 +8997,242 @@ async function deployApiFlowToStage(
 }
 
 module.exports = {
-  fetchApiFlow,
-  fetchApiFlowsByStage,
-  importApiFlow,
+  exportApis,
+  importApis,
   deployApiFlowToStage
 }
 
 
 /***/ }),
 
-/***/ 3732:
+/***/ 1300:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 const core = __nccwpck_require__(2186)
 const axios = __nccwpck_require__(8757)
 const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
 
-async function exportProjectResources(authToken, projectId, domain, stage) {
+async function exportModels(authToken, projectId, ids, domain) {
   const data = JSON.stringify({
-    query: `query ExportProjectResources($input: ExportProjectResourcesInput!) { 
-      exportProjectResources(input: $input) { 
-          connectors
-          apis
-          models
-      }
-  }`,
-    variables: { input: { projectId, apisStage: stage } }
+    query: `query exportModels($input: ExportModelsInput) {
+      exportModels(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, ids }
+    }
   })
 
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
     const response = await axios.request(config)
-    return response.data.data.exportProjectResources
+    core.debug(
+      `Fetched models: ${JSON.stringify(response.data.data.exportModels)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportModels
   } catch (error) {
-    core.debug(`Unable to export resources for ${projectId}. Error: ${error}`)
+    core.debug(`Unable to fetch models. Error: ${error}`)
   }
 }
 
-async function importProjectResources(
-  authToken,
-  projectId,
-  domain,
-  apis,
-  models,
-  connectors
-) {
+async function importModels(authToken, projectId, models, domain) {
   const data = JSON.stringify({
-    query: `mutation ImportProjectResources($input: ImportProjectResourcesInput!) { 
-      importProjectResources(input: $input) 
-  }`,
-    variables: { input: { projectId, apis, models, connectors } }
+    query: `mutation importModels($input: ImportModelsInput) {
+      importModels(input: $input) 
+    }`,
+    variables: { input: { projectId, models } }
   })
 
-  const config = {
-    method: 'post',
-    maxBodyLength: Infinity,
-    url: `https://api.${domain}/graphql`,
-    headers: {
-      authorization: `Bearer ${authToken}`,
-      'content-type': 'application/json',
-      'fastn-space-id': projectId,
-      realm: 'fastn'
-    },
-    data
-  }
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(
-      `Unable to import project resources in ${projectId}. Error: ${error}`
-    )
+    core.debug(`Unable to import models. Error: ${error}`)
   }
 }
 
 module.exports = {
-  exportProjectResources,
-  importProjectResources
+  exportModels,
+  importModels
+}
+
+
+/***/ }),
+
+/***/ 2051:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportTemplates(authToken, projectId, orgId, ids, domain) {
+  const data = JSON.stringify({
+    query: `query exportTemplates($input: ExportTemplatesInput) {
+      exportTemplates(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, orgId, ids }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched templates: ${JSON.stringify(response.data.data.exportTemplates)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportTemplates
+  } catch (error) {
+    core.debug(`Unable to fetch templates. Error: ${error}`)
+  }
+}
+
+async function importTemplates(authToken, projectId, orgId, templates, domain) {
+  const data = JSON.stringify({
+    query: `mutation importTemplates($input: ImportTemplatesInput) {
+      importTemplates(input: $input) 
+    }`,
+    variables: { input: { projectId, orgId, templates } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import templates. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportTemplates,
+  importTemplates
+}
+
+
+/***/ }),
+
+/***/ 4817:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportWebhooks(authToken, projectId, ids, domain) {
+  const data = JSON.stringify({
+    query: `query exportWebhooks($input: ExportWebhooksInput) {
+      exportWebhooks(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, ids }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched webhooks: ${JSON.stringify(response.data.data.exportWebhooks)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportWebhooks
+  } catch (error) {
+    core.debug(`Unable to fetch webhooks. Error: ${error}`)
+  }
+}
+
+async function importWebhooks(authToken, projectId, webhooks, domain) {
+  const data = JSON.stringify({
+    query: `mutation importWebhooks($input: ImportWebhooksInput) {
+      importWebhooks(input: $input) 
+    }`,
+    variables: { input: { projectId, webhooks } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import webhooks. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportWebhooks,
+  importWebhooks
+}
+
+
+/***/ }),
+
+/***/ 3601:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186)
+const axios = __nccwpck_require__(8757)
+const qs = __nccwpck_require__(2760)
+const { getGraphQlReqConfigs } = __nccwpck_require__(126)
+
+async function exportWidgetConnectors(authToken, projectId, ids, domain) {
+  const data = JSON.stringify({
+    query: `query exportWidgetConnectors($input: ExportWidgetConnectorsInput) {
+      exportWidgetConnectors(input: $input) 
+    }`,
+    variables: {
+      input: { projectId, ids }
+    }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(
+      `Fetched widget connectors: ${JSON.stringify(response.data.data.exportWidgetConnectors)} from ${projectId} on ${domain}`
+    )
+    return response.data.data.exportWidgetConnectors
+  } catch (error) {
+    core.debug(`Unable to fetch widget connectors. Error: ${error}`)
+  }
+}
+
+async function importWidgetConnectors(
+  authToken,
+  projectId,
+  widgetConnectors,
+  domain
+) {
+  const data = JSON.stringify({
+    query: `mutation importWidgetConnectors($input: ImportWidgetConnectorsInput) {
+      importWidgetConnectors(input: $input) 
+    }`,
+    variables: { input: { projectId, widgetConnectors } }
+  })
+
+  const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
+
+  try {
+    const response = await axios.request(config)
+    core.debug(response.data)
+  } catch (error) {
+    core.debug(`Unable to import widget connectors. Error: ${error}`)
+  }
+}
+
+module.exports = {
+  exportWidgetConnectors,
+  importWidgetConnectors
 }
 
 
@@ -9077,12 +9245,17 @@ const core = __nccwpck_require__(2186)
 const axios = __nccwpck_require__(8757)
 const qs = __nccwpck_require__(2760)
 
-const { deployApiFlowToStage } = __nccwpck_require__(1906)
+const { importApis, deployApiFlowToStage, exportApis } = __nccwpck_require__(1906)
 const { fetchAuthToken } = __nccwpck_require__(7187)
+const { splitString, parseResourcesToExport } = __nccwpck_require__(126)
+const { exportConnectors, importConnectors } = __nccwpck_require__(8420)
+const { exportWebhooks, importWebhooks } = __nccwpck_require__(4817)
 const {
-  exportProjectResources,
-  importProjectResources
-} = __nccwpck_require__(3732)
+  exportWidgetConnectors,
+  importWidgetConnectors
+} = __nccwpck_require__(3601)
+const { exportModels, importModels } = __nccwpck_require__(1300)
+const { exportTemplates, importTemplates } = __nccwpck_require__(2051)
 
 /**
  * The main function for the action.
@@ -9090,6 +9263,7 @@ const {
  */
 async function run() {
   try {
+    // Source Inputs TODO: Cleanup
     const srcUsername = core.getInput('source-account-username', {
       required: true
     })
@@ -9102,12 +9276,25 @@ async function run() {
     const srcProjectId = core.getInput('source-project-id', {
       required: true
     })
-    const srcFlowNameInput = core.getInput('source-flow-name', {
-      required: true
-    })
-    core.debug(` ${srcFlowNameInput}`)
-    const srcStage = core.getInput('source-stage')
+    const resourcesToExport = core.getInput('source-resources')
+    // Flow Inputs
+    const srcFlowNameInput = core.getInput('source-flow-names')
+    const srcFlowStage = core.getInput('source-flow-stage')
+    // Connector Inputs
+    const srcConnectorIdInput = core.getInput('source-connector-ids')
+    const srcConnectorOrgId = core.getInput('source-connector-org-id')
+    const srcConnectorGroupIdInput = core.getInput('source-connector-group-ids')
+    // Model Inputs
+    const srcModelIdInput = core.getInput('source-model-ids')
+    // Template Inputs
+    const srcTemplateIdInput = core.getInput('source-template-ids')
+    const srcTemplateOrgId = core.getInput('source-template-org-id')
+    // Webhook Inputs
+    const srcWebhookIdInput = core.getInput('source-webhook-ids')
+    // Widget Inputs
+    const srcWidgetIdInput = core.getInput('source-widget-ids')
 
+    // Destination Inputs
     const desUsername = core.getInput('destination-account-username', {
       required: true
     })
@@ -9120,8 +9307,14 @@ async function run() {
     const desProjectId = core.getInput('destination-project-id', {
       required: true
     })
-    const desFlowNameInput = core.getInput('destination-flow-name')
-    const desStage = core.getInput('destination-stage')
+    // Flow Inputs
+    const desFlowStage = core.getInput('destination-flow-stage')
+    // Connector Inputs
+    const desConnectorOrgId = core.getInput('destination-connector-org-id')
+    // Template Inputs
+    const desTemplateOrgId = core.getInput('destination-template-org-id')
+
+    const resourceFlags = parseResourcesToExport(resourcesToExport)
 
     const srcAuthToken = await fetchAuthToken(
       srcUsername,
@@ -9129,46 +9322,6 @@ async function run() {
       srcDomain
     )
     core.debug(`Fetched source auth token: ${srcAuthToken} for ${srcUsername}`)
-
-    const exportData = await exportProjectResources(
-      srcAuthToken,
-      srcProjectId,
-      srcDomain,
-      srcStage
-    )
-
-    core.debug(`Exported project resources from ${srcProjectId}.`)
-
-    // Fetch APIs
-
-    //   for (const flowName of srcFlowNames) {
-    //     const fetchedApi = await flows.fetchApiFlow(
-    //       srcAuthToken,
-    //       srcProjectId,
-    //       flowName,
-    //       srcDomain
-    //     )
-    //     fetchedApis.push(fetchedApi)
-    //     core.debug(
-    //       `Fetched flow: ${JSON.stringify(fetchedApi)} for ${srcUsername}`
-    //     )
-    //   }
-    // } else {
-    //   fetchedApis = await flows.fetchApiFlowsByStage(
-    //     srcAuthToken,
-    //     srcProjectId,
-    //     srcDomain,
-    //     srcStage
-    //   )
-
-    //   for (const api of fetchedApis) {
-    //     srcFlowNames.push(api.api.name)
-    //   }
-
-    //   core.debug(
-    //     `Fetched flows: ${JSON.stringify(fetchedApis)} for ${srcUsername}`
-    //   )
-    // }
 
     const desAuthToken = await fetchAuthToken(
       desUsername,
@@ -9179,52 +9332,146 @@ async function run() {
       `Fetched destination auth token: ${desAuthToken} for ${desUsername}`
     )
 
-    // filter out specific apis here
-    let srcFlowNames = []
-    let apisToImport = []
-
-    if (srcFlowNameInput) {
-      srcFlowNames = srcFlowNameInput
-        .split(', ')
-        .filter(item => item.trim() !== '')
-      core.debug(`Flow names input: ${srcFlowNames}`)
-
-      apisToImport = exportData.apis.filter(api =>
-        srcFlowNames.includes('activateMicrosoftGraph')
+    // Export and Import Connectors
+    if (resourceFlags.exportConnectors) {
+      core.debug(`Exporting Connectors`)
+      const exportedConnectors = await exportConnectors(
+        srcAuthToken,
+        srcProjectId,
+        srcConnectorOrgId,
+        splitString(srcConnectorIdInput),
+        splitString(srcConnectorGroupIdInput),
+        srcDomain
       )
-    } else {
-      apisToImport = exportData.apis
+
+      if (exportedConnectors) {
+        core.debug(`Importing Connectors`)
+        await importConnectors(
+          desAuthToken,
+          desProjectId,
+          desConnectorOrgId,
+          exportedConnectors,
+          desDomain
+        )
+      }
     }
 
-    core.debug(`Apis to import ${apisToImport}`)
-
-    const fetchedFlowNames = []
-
-    for (const flow of apisToImport) {
-      fetchedFlowNames.push(flow.name)
-    }
-
-    // import project resources
-    await importProjectResources(
-      desAuthToken,
-      desProjectId,
-      desDomain,
-      apisToImport,
-      exportData.models,
-      exportData.connectors
-    )
-    core.debug(`Imported project resources in ${desProjectId}`)
-
-    // // deploy flows
-    for (const apiName of fetchedFlowNames) {
-      await deployApiFlowToStage(
-        desAuthToken,
-        desProjectId,
-        apiName,
-        desStage,
-        desDomain
+    // Export and Import Templates
+    if (resourceFlags.exportTemplates) {
+      core.debug(`Exporting Templates`)
+      const exportedTemplates = await exportTemplates(
+        srcAuthToken,
+        srcProjectId,
+        srcTemplateOrgId,
+        splitString(srcTemplateIdInput),
+        srcDomain
       )
-      core.debug(`Deployed ${apiName} to ${desStage}`)
+
+      if (exportedTemplates) {
+        core.debug(`Importing Templates`)
+        await importTemplates(
+          desAuthToken,
+          desProjectId,
+          desTemplateOrgId,
+          exportedTemplates,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Models
+    if (resourceFlags.exportModels) {
+      core.debug(`Exporting Models`)
+      const exportedModels = await exportModels(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcModelIdInput),
+        srcDomain
+      )
+
+      if (exportedModels) {
+        core.debug(`Importing Models`)
+        await importModels(
+          desAuthToken,
+          desProjectId,
+          exportedModels,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Flows
+    if (resourceFlags.exportFlows) {
+      core.debug(`Exporting Flows`)
+      core.debug(`${JSON.stringify(splitString(srcFlowNameInput))}`)
+      const exportedFlows = await exportApis(
+        srcAuthToken,
+        srcProjectId,
+        srcDomain,
+        srcFlowStage || 'LIVE',
+        splitString(srcFlowNameInput)
+      )
+
+      if (exportedFlows) {
+        core.debug(`Importing Flows`)
+        await importApis(
+          desAuthToken,
+          desProjectId,
+          exportedFlows,
+          desFlowStage || 'LIVE',
+          desDomain
+        )
+
+        core.debug(`Deploying Flows`)
+        for (const apiName of splitString(srcFlowNameInput)) {
+          await deployApiFlowToStage(
+            desAuthToken,
+            desProjectId,
+            apiName,
+            desFlowStage,
+            desDomain
+          )
+          core.debug(`Deployed ${apiName} to ${desFlowStage}`)
+        }
+      }
+    }
+    // Export and Import Webhooks
+    if (resourceFlags.exportWebhooks) {
+      core.debug(`Exporting Webhooks`)
+      const exportedWebhooks = await exportWebhooks(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcWebhookIdInput),
+        srcDomain
+      )
+
+      if (exportedWebhooks) {
+        core.debug(`Importing Webhooks`)
+        await importWebhooks(
+          desAuthToken,
+          desProjectId,
+          exportedWebhooks,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Widgets
+    if (resourceFlags.exportWidgets) {
+      core.debug(`Exporting Widgets`)
+      const exportedWidgetConnectors = await exportWidgetConnectors(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcWidgetIdInput),
+        srcDomain
+      )
+
+      if (exportedWidgetConnectors) {
+        core.debug(`Importing Widgets`)
+        await importWidgetConnectors(
+          desAuthToken,
+          desProjectId,
+          exportedWidgetConnectors,
+          desDomain
+        )
+      }
     }
   } catch (error) {
     core.setFailed(error.message)
@@ -9233,6 +9480,90 @@ async function run() {
 
 module.exports = {
   run
+}
+
+
+/***/ }),
+
+/***/ 126:
+/***/ ((module) => {
+
+function parseResourcesToExport(resourcesInput) {
+  const resourcesList = splitString(resourcesInput).map(resource =>
+    resource.toUpperCase().replace(/S$/, '')
+  )
+
+  const resourceFlags = {
+    exportFlows: false,
+    exportConnectors: false,
+    exportModels: false,
+    exportTemplates: false,
+    exportWebhooks: false,
+    exportWidgets: false
+  }
+
+  if (resourcesList.includes('ALL')) {
+    for (const flag in resourceFlags) {
+      if (Object.prototype.hasOwnProperty.call(resourceFlags, flag)) {
+        resourceFlags[flag] = true
+      }
+    }
+  } else {
+    // eslint-disable-next-line github/array-foreach
+    resourcesList.forEach(resource => {
+      switch (resource) {
+        case 'FLOW':
+          resourceFlags.exportFlows = true
+          break
+        case 'CONNECTOR':
+          resourceFlags.exportConnectors = true
+          break
+        case 'MODEL':
+          resourceFlags.exportModels = true
+          break
+        case 'TEMPLATE':
+          resourceFlags.exportTemplates = true
+          break
+        case 'WEBHOOK':
+          resourceFlags.exportWebhooks = true
+          break
+        case 'WIDGET':
+          resourceFlags.exportWidgets = true
+          break
+        default:
+          break
+      }
+    })
+  }
+
+  return resourceFlags
+}
+
+function splitString(input) {
+  if (input) return input.split(',').map(item => item.trim())
+
+  return []
+}
+
+function getGraphQlReqConfigs(domain, authToken, projectId, data) {
+  return {
+    method: 'post',
+    maxBodyLength: Infinity,
+    url: `https://api.${domain}/graphql`,
+    headers: {
+      authorization: `Bearer ${authToken}`,
+      'content-type': 'application/json',
+      'fastn-space-id': projectId,
+      realm: 'fastn'
+    },
+    data
+  }
+}
+
+module.exports = {
+  splitString,
+  parseResourcesToExport,
+  getGraphQlReqConfigs
 }
 
 

@@ -2,12 +2,17 @@ const core = require('@actions/core')
 const axios = require('axios')
 const qs = require('qs')
 
-const { deployApiFlowToStage } = require('./apis/flows')
+const { importApis, deployApiFlowToStage, exportApis } = require('./apis/flows')
 const { fetchAuthToken } = require('./apis/auth')
+const { splitString, parseResourcesToExport } = require('./utilities/helpers')
+const { exportConnectors, importConnectors } = require('./apis/connectors')
+const { exportWebhooks, importWebhooks } = require('./apis/webhooks')
 const {
-  exportProjectResources,
-  importProjectResources
-} = require('./apis/projects')
+  exportWidgetConnectors,
+  importWidgetConnectors
+} = require('./apis/widget-connectors')
+const { exportModels, importModels } = require('./apis/models')
+const { exportTemplates, importTemplates } = require('./apis/templates')
 
 /**
  * The main function for the action.
@@ -15,6 +20,7 @@ const {
  */
 async function run() {
   try {
+    // Source Inputs TODO: Cleanup
     const srcUsername = core.getInput('source-account-username', {
       required: true
     })
@@ -27,12 +33,25 @@ async function run() {
     const srcProjectId = core.getInput('source-project-id', {
       required: true
     })
-    const srcFlowNameInput = core.getInput('source-flow-name', {
-      required: true
-    })
-    core.debug(` ${srcFlowNameInput}`)
-    const srcStage = core.getInput('source-stage')
+    const resourcesToExport = core.getInput('source-resources')
+    // Flow Inputs
+    const srcFlowNameInput = core.getInput('source-flow-names')
+    const srcFlowStage = core.getInput('source-flow-stage')
+    // Connector Inputs
+    const srcConnectorIdInput = core.getInput('source-connector-ids')
+    const srcConnectorOrgId = core.getInput('source-connector-org-id')
+    const srcConnectorGroupIdInput = core.getInput('source-connector-group-ids')
+    // Model Inputs
+    const srcModelIdInput = core.getInput('source-model-ids')
+    // Template Inputs
+    const srcTemplateIdInput = core.getInput('source-template-ids')
+    const srcTemplateOrgId = core.getInput('source-template-org-id')
+    // Webhook Inputs
+    const srcWebhookIdInput = core.getInput('source-webhook-ids')
+    // Widget Inputs
+    const srcWidgetIdInput = core.getInput('source-widget-ids')
 
+    // Destination Inputs
     const desUsername = core.getInput('destination-account-username', {
       required: true
     })
@@ -45,8 +64,14 @@ async function run() {
     const desProjectId = core.getInput('destination-project-id', {
       required: true
     })
-    const desFlowNameInput = core.getInput('destination-flow-name')
-    const desStage = core.getInput('destination-stage')
+    // Flow Inputs
+    const desFlowStage = core.getInput('destination-flow-stage')
+    // Connector Inputs
+    const desConnectorOrgId = core.getInput('destination-connector-org-id')
+    // Template Inputs
+    const desTemplateOrgId = core.getInput('destination-template-org-id')
+
+    const resourceFlags = parseResourcesToExport(resourcesToExport)
 
     const srcAuthToken = await fetchAuthToken(
       srcUsername,
@@ -54,46 +79,6 @@ async function run() {
       srcDomain
     )
     core.debug(`Fetched source auth token: ${srcAuthToken} for ${srcUsername}`)
-
-    const exportData = await exportProjectResources(
-      srcAuthToken,
-      srcProjectId,
-      srcDomain,
-      srcStage
-    )
-
-    core.debug(`Exported project resources from ${srcProjectId}.`)
-
-    // Fetch APIs
-
-    //   for (const flowName of srcFlowNames) {
-    //     const fetchedApi = await flows.fetchApiFlow(
-    //       srcAuthToken,
-    //       srcProjectId,
-    //       flowName,
-    //       srcDomain
-    //     )
-    //     fetchedApis.push(fetchedApi)
-    //     core.debug(
-    //       `Fetched flow: ${JSON.stringify(fetchedApi)} for ${srcUsername}`
-    //     )
-    //   }
-    // } else {
-    //   fetchedApis = await flows.fetchApiFlowsByStage(
-    //     srcAuthToken,
-    //     srcProjectId,
-    //     srcDomain,
-    //     srcStage
-    //   )
-
-    //   for (const api of fetchedApis) {
-    //     srcFlowNames.push(api.api.name)
-    //   }
-
-    //   core.debug(
-    //     `Fetched flows: ${JSON.stringify(fetchedApis)} for ${srcUsername}`
-    //   )
-    // }
 
     const desAuthToken = await fetchAuthToken(
       desUsername,
@@ -104,52 +89,146 @@ async function run() {
       `Fetched destination auth token: ${desAuthToken} for ${desUsername}`
     )
 
-    // filter out specific apis here
-    let srcFlowNames = []
-    let apisToImport = []
-
-    if (srcFlowNameInput) {
-      srcFlowNames = srcFlowNameInput
-        .split(', ')
-        .filter(item => item.trim() !== '')
-      core.debug(`Flow names input: ${srcFlowNames}`)
-
-      apisToImport = exportData.apis.filter(api =>
-        srcFlowNames.includes('activateMicrosoftGraph')
+    // Export and Import Connectors
+    if (resourceFlags.exportConnectors) {
+      core.debug(`Exporting Connectors`)
+      const exportedConnectors = await exportConnectors(
+        srcAuthToken,
+        srcProjectId,
+        srcConnectorOrgId,
+        splitString(srcConnectorIdInput),
+        splitString(srcConnectorGroupIdInput),
+        srcDomain
       )
-    } else {
-      apisToImport = exportData.apis
+
+      if (exportedConnectors) {
+        core.debug(`Importing Connectors`)
+        await importConnectors(
+          desAuthToken,
+          desProjectId,
+          desConnectorOrgId,
+          exportedConnectors,
+          desDomain
+        )
+      }
     }
 
-    core.debug(`Apis to import ${apisToImport}`)
-
-    const fetchedFlowNames = []
-
-    for (const flow of apisToImport) {
-      fetchedFlowNames.push(flow.name)
-    }
-
-    // import project resources
-    await importProjectResources(
-      desAuthToken,
-      desProjectId,
-      desDomain,
-      apisToImport,
-      exportData.models,
-      exportData.connectors
-    )
-    core.debug(`Imported project resources in ${desProjectId}`)
-
-    // // deploy flows
-    for (const apiName of fetchedFlowNames) {
-      await deployApiFlowToStage(
-        desAuthToken,
-        desProjectId,
-        apiName,
-        desStage,
-        desDomain
+    // Export and Import Templates
+    if (resourceFlags.exportTemplates) {
+      core.debug(`Exporting Templates`)
+      const exportedTemplates = await exportTemplates(
+        srcAuthToken,
+        srcProjectId,
+        srcTemplateOrgId,
+        splitString(srcTemplateIdInput),
+        srcDomain
       )
-      core.debug(`Deployed ${apiName} to ${desStage}`)
+
+      if (exportedTemplates) {
+        core.debug(`Importing Templates`)
+        await importTemplates(
+          desAuthToken,
+          desProjectId,
+          desTemplateOrgId,
+          exportedTemplates,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Models
+    if (resourceFlags.exportModels) {
+      core.debug(`Exporting Models`)
+      const exportedModels = await exportModels(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcModelIdInput),
+        srcDomain
+      )
+
+      if (exportedModels) {
+        core.debug(`Importing Models`)
+        await importModels(
+          desAuthToken,
+          desProjectId,
+          exportedModels,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Flows
+    if (resourceFlags.exportFlows) {
+      core.debug(`Exporting Flows`)
+      core.debug(`${JSON.stringify(splitString(srcFlowNameInput))}`)
+      const exportedFlows = await exportApis(
+        srcAuthToken,
+        srcProjectId,
+        srcDomain,
+        srcFlowStage || 'LIVE',
+        splitString(srcFlowNameInput)
+      )
+
+      if (exportedFlows) {
+        core.debug(`Importing Flows`)
+        await importApis(
+          desAuthToken,
+          desProjectId,
+          exportedFlows,
+          desFlowStage || 'LIVE',
+          desDomain
+        )
+
+        core.debug(`Deploying Flows`)
+        for (const apiName of splitString(srcFlowNameInput)) {
+          await deployApiFlowToStage(
+            desAuthToken,
+            desProjectId,
+            apiName,
+            desFlowStage,
+            desDomain
+          )
+          core.debug(`Deployed ${apiName} to ${desFlowStage}`)
+        }
+      }
+    }
+    // Export and Import Webhooks
+    if (resourceFlags.exportWebhooks) {
+      core.debug(`Exporting Webhooks`)
+      const exportedWebhooks = await exportWebhooks(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcWebhookIdInput),
+        srcDomain
+      )
+
+      if (exportedWebhooks) {
+        core.debug(`Importing Webhooks`)
+        await importWebhooks(
+          desAuthToken,
+          desProjectId,
+          exportedWebhooks,
+          desDomain
+        )
+      }
+    }
+    // Export and Import Widgets
+    if (resourceFlags.exportWidgets) {
+      core.debug(`Exporting Widgets`)
+      const exportedWidgetConnectors = await exportWidgetConnectors(
+        srcAuthToken,
+        srcProjectId,
+        splitString(srcWidgetIdInput),
+        srcDomain
+      )
+
+      if (exportedWidgetConnectors) {
+        core.debug(`Importing Widgets`)
+        await importWidgetConnectors(
+          desAuthToken,
+          desProjectId,
+          exportedWidgetConnectors,
+          desDomain
+        )
+      }
     }
   } catch (error) {
     core.setFailed(error.message)

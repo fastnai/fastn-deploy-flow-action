@@ -3,6 +3,7 @@ name: Continuous Integration
 on:
   workflow_dispatch:
     inputs:
+      # Source Inputs
       source-domain:
         required: true
         type: string
@@ -11,6 +12,46 @@ on:
         required: true
         type: string
         description: 'source-project-id'
+      source-resources:
+        type: string
+        description: 'source-resources'
+      # Flow Inputs
+      source-flow-names:
+        type: string
+        description: 'source-flow-names'
+      source-flow-stage:
+        type: string
+        description: 'source-flow-stage'
+      # Connector Inputs
+      source-connector-org-id:
+        type: string
+        description: 'source-connector-org-id'
+      source-connector-group-ids:
+        type: string
+        description: 'source-connector-group-ids'
+      source-connector-ids:
+        type: string
+        description: 'source-connector-ids'
+      # Model Inputs
+      source-model-ids:
+        type: string
+        description: 'source-model-ids'
+      # Template Inputs
+      source-template-ids:
+        type: string
+        description: 'source-template-ids'
+      source-template-org-id:
+        type: string
+        description: 'source-template-org-id'
+      # Webhook Inputs
+      source-webhook-ids:
+        type: string
+        description: 'source-webhook-ids'
+      # Widget Inputs
+      source-widget-ids:
+        type: string
+        description: 'source-widget-ids'
+      # Source Auth
       source-account-username:
         required: true
         type: string
@@ -19,9 +60,7 @@ on:
         required: true
         type: string
         description: 'source-account-password'
-      source-flow-name:
-        type: string
-        description: 'source-flow-name'
+      # Destination Inputs
       destination-domain:
         required: true
         type: string
@@ -30,6 +69,19 @@ on:
         required: true
         type: string
         description: 'destination-project-id'
+      # Flow Inputs
+      destination-flow-stage:
+        type: string
+        description: 'destination-flow-stage'
+      # Connector Inputs
+      destination-connector-org-id:
+        type: string
+        description: 'destination-connector-org-id'
+      # Template Inputs
+      destination-template-org-id:
+        type: string
+        description: 'destination-template-org-id'
+      # Destination Auth
       destination-account-username:
         required: true
         type: string
@@ -56,16 +108,46 @@ jobs:
         id: test-action
         uses: ./
         with:
+          # Source Inputs
           source-domain: ${{ github.event.inputs.source-domain }}
           source-project-id: ${{ github.event.inputs.source-project-id }}
+          source-resources: ${{ github.event.inputs.source-resources }}
+          # Flow Inputs
+          source-flow-names: ${{ github.event.inputs.source-flow-names }}
+          source-flow-stage: ${{ github.event.inputs.source-flow-stage }}
+          # Connector Inputs
+          source-connector-org-id:
+            ${{ github.event.inputs.source-connector-org-id }}
+          source-connector-group-ids:
+            ${{ github.event.inputs.source-connector-group-ids }}
+          source-connector-ids: ${{ github.event.inputs.source-connector-ids }}
+          # Model Inputs
+          source-model-ids: ${{ github.event.inputs.source-model-ids }}
+          # Template Inputs
+          source-template-ids: ${{ github.event.inputs.source-template-ids }}
+          source-template-org-id:
+            ${{ github.event.inputs.source-template-org-id }}
+          # Webhook Inputs
+          source-webhook-ids: ${{ github.event.inputs.source-webhook-ids }}
+          # Widget Inputs
+          source-widget-ids: ${{ github.event.inputs.source-widget-ids }}
+          # Source Auth
           source-account-username:
             ${{ github.event.inputs.source-account-username }}
           source-account-password:
             ${{ github.event.inputs.source-account-password }}
           source-flow-name: ${{ github.event.inputs.source-flow-name}}
+          # Destination Domain
           destination-domain: ${{ github.event.inputs.destination-domain }}
           destination-project-id:
             ${{ github.event.inputs.destination-project-id }}
+          # Flow Inputs
+          destination-flow-stage:
+            ${{ github.event.inputs.destination-flow-stage }}
+          # Template Inputs
+          destination-template-org-id:
+            ${{ github.event.inputs.destination-template-org-id }}
+          # Destination Auth
           destination-account-username:
             ${{ github.event.inputs.destination-account-username }}
           destination-account-password:

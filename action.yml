@@ -4,23 +4,65 @@ author: 'Fastn Inc.'
 
 # Define your inputs here.
 inputs:
+  # Source Inputs
   source-domain:
     description:
-      'Fastn environment URI from where to fetch the flow e.g. qa.fastn.ai,
+      'Fastn environment URI from where to fetch the resources e.g. qa.fastn.ai,
       prod.fastn.ai'
     required: true
   source-project-id:
-    description: 'Project ID where the flow to deploy is present'
+    description: 'Project ID from where the resources will be fetched'
     required: true
-  source-flow-name:
+  source-resources:
+    description:
+      'Type of resources to export. Currently supported "All", "Flows",
+      "Connectors", "Models", "Templates", "Webhooks", "Widgets"'
+    default: 'Connectors, Flows'
+  # Flow Inputs
+  source-flow-names:
     description:
       'Optional - Name of the flow to deploy. For multiple flows a comma
       seperated list can be used e.g. flow1,flow2. If name is not provided all
-      flows will be fetched from source stage and deployed'
-  source-stage:
+      flows will be fetched from source stage and deployed. Ignored if flows not
+      selected in source-resources'
+  source-flow-stage:
     description:
       'Optional - stage from where to pick the flows. e.g. QA, DRAFT, LIVE'
     default: 'LIVE'
+  # Connector Inputs
+  source-connector-org-id:
+    description: ''
+  source-connector-group-ids:
+    description: ''
+  source-connector-ids:
+    description: ''
+  # Model Inputs
+  source-model-ids:
+    description:
+      'Optional - Name of the flow to deploy. For multiple flows a comma
+      seperated list can be used e.g. flow1,flow2. If name is not provided all
+      flows will be fetched from source stage and deployed. Ignored if flows not
+      selected in source-resources'
+  # Template Inputs
+  source-template-ids:
+    description: ''
+  source-template-org-id:
+    description: ''
+  # Webhook Inputs
+  source-webhook-ids:
+    description:
+      'Optional - Ids of the webhooks to deploy. For multiple webhooks a comma
+      seperated list can be used e.g. webhook1,webhook2. If id is not provided
+      all webhooks will be fetched from source project and copied to destinaton.
+      Ignored if webhooks not selected in source-resources'
+  # Widget Inputs
+  source-widget-ids:
+    description:
+      'Optional - Ids of the widgets to deploy. For multiple widgets a comma
+      seperated list can be used e.g. widget1,widget2. If id is not provided all
+      widgets will be fetched from source project and copied to destinaton.
+      Ignored if widgets not selected in source-resources'
+  # Source Auth
   source-account-username:
     description:
       'Username of the account from where the flow to deploy is present'
@@ -29,22 +71,27 @@ inputs:
     description:
       'Password of the account from where the flow to deploy is present'
     required: true
-  resources-to-export:
-    description:
-      'Config for which resources to export e.g. ALL, FLOWS, MODELS, CONNECTORS'
-    default: 'ALL'
+  # Destination Inputs
   destination-domain:
     description:
       'Fastn environment from where to deploy the flow e.g. qa.fastn.ai,
       prod.fastn.ai'
     required: true
   destination-project-id:
-    description: 'Project ID where the flow will be deployed'
+    description: ''
     required: true
-  destination-stage:
+  # Flow Inputs
+  destination-flow-stage:
     description:
       'Optional - stage where to deploy the flows. e.g. QA, DRAFT, LIVE'
     default: 'LIVE'
+  # Connector Input
+  destination-connector-org-id:
+    description: ''
+  # Template Inputs
+  destination-template-org-id:
+    description: ''
+  # Destination Auth
   destination-account-username:
     description: 'Username of the account where the flow will be deployed'
     required: true
