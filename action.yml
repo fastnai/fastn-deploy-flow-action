@@ -1,5 +1,5 @@
 name: 'Fastn Deploy Flow Action'
-description: 'Github Action for deploying flows'
+description: 'Github Action for deploying flows and other resources'
 author: 'Fastn Inc.'
 
 # Define your inputs here.
@@ -7,47 +7,63 @@ inputs:
   # Source Inputs
   source-domain:
     description:
-      'Fastn environment URI from where to fetch the resources e.g. qa.fastn.ai,
-      prod.fastn.ai'
+      'fastn environment URI from where to fetch the resources e.g.
+      qa.fastn.ai., prod.fastn.ai'
     required: true
   source-project-id:
-    description: 'Project ID from where the resources will be fetched'
+    description: 'Project ID from where the resources will be fetched.'
     required: true
   source-resources:
     description:
       'Type of resources to export. Currently supported "All", "Flows",
-      "Connectors", "Models", "Templates", "Webhooks", "Widgets"'
-    default: 'Connectors, Flows'
+      "Connectors", "Models", "Templates", "Webhooks", "Widgets". Passed as
+      comma seperated strings.'
   # Flow Inputs
   source-flow-names:
     description:
       'Optional - Name of the flow to deploy. For multiple flows a comma
       seperated list can be used e.g. flow1,flow2. If name is not provided all
       flows will be fetched from source stage and deployed. Ignored if flows not
-      selected in source-resources'
+      selected in source-resources.'
   source-flow-stage:
     description:
-      'Optional - stage from where to pick the flows. e.g. QA, DRAFT, LIVE'
-    default: 'LIVE'
+      'Optional - stage from where to pick the flows. e.g. QA, DRAFT, LIVE.
+      Default is LIVE.'
   # Connector Inputs
   source-connector-org-id:
-    description: ''
+    description:
+      'Org id of the connectors. For community connectors org id is passed as
+      community.'
   source-connector-group-ids:
-    description: ''
+    description:
+      'Optional - Name of the connector groups to deploy. For multiple a comma
+      seperated list can be used e.g. conn-grp1,conn-grp2. If name is not
+      provided all connector groups will be fetched from source stage and
+      deployed. Ignored if connectors not selected in source-resources.'
   source-connector-ids:
-    description: ''
+    description:
+      'Optional - Name of the connectors to deploy. For multiple connectors a
+      comma seperated list can be used e.g. conn1,conn2. If name is not provided
+      all connectors will be fetched from source stage and deployed. Ignored if
+      connectors not selected in source-resources.'
   # Model Inputs
   source-model-ids:
     description:
-      'Optional - Name of the flow to deploy. For multiple flows a comma
-      seperated list can be used e.g. flow1,flow2. If name is not provided all
-      flows will be fetched from source stage and deployed. Ignored if flows not
-      selected in source-resources'
+      'Optional - Name of the model to deploy. For multiple models a comma
+      seperated list can be used e.g. model1,model2. If name is not provided all
+      models will be fetched from source stage. Ignored if models not selected
+      in source-resources.'
   # Template Inputs
   source-template-ids:
-    description: ''
+    description:
+      'Optional - Ids of the templates to deploy. For multiple templates a comma
+      seperated list can be used e.g. template1,template2. If id is not provided
+      all templates will be fetched from source project and copied to
+      destinaton. Ignored if templates not selected in source-resources'
   source-template-org-id:
-    description: ''
+    description:
+      'Org id of the templates. For community templates org id is passed as
+      community.'
   # Webhook Inputs
   source-webhook-ids:
     description:
@@ -64,39 +80,38 @@ inputs:
       Ignored if widgets not selected in source-resources'
   # Source Auth
   source-account-username:
-    description:
-      'Username of the account from where the flow to deploy is present'
+    description: 'Username of the source account.'
     required: true
   source-account-password:
-    description:
-      'Password of the account from where the flow to deploy is present'
+    description: 'Password of the source account.'
     required: true
   # Destination Inputs
   destination-domain:
     description:
-      'Fastn environment from where to deploy the flow e.g. qa.fastn.ai,
-      prod.fastn.ai'
+      'fastn environment where the resources will be deployed e.g. qa.fastn.ai'
     required: true
   destination-project-id:
-    description: ''
+    description: 'Project ID where the resources will be deployed.'
     required: true
   # Flow Inputs
   destination-flow-stage:
     description:
-      'Optional - stage where to deploy the flows. e.g. QA, DRAFT, LIVE'
-    default: 'LIVE'
+      'Optional - stage where the flows are deployed. e.g. QA, DRAFT, LIVE.
+      Default is LIVE.'
   # Connector Input
   destination-connector-org-id:
-    description: ''
+    description:
+      'Connector org id in the destination where connectors will be deployed.'
   # Template Inputs
   destination-template-org-id:
-    description: ''
+    description:
+      'Template org id in the destination where templates will be deployed.'
   # Destination Auth
   destination-account-username:
-    description: 'Username of the account where the flow will be deployed'
+    description: 'Username of the destination account.'
     required: true
   destination-account-password:
-    description: 'Password of the account where the flow will be deployed'
+    description: 'Password of the destination account.'
     required: true
 
 runs:

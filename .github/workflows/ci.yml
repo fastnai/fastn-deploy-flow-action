@@ -8,7 +8,7 @@ on:
         type: string
         default: '{}'
         required: true
- 
+
 permissions:
   contents: read
 
@@ -69,6 +69,9 @@ jobs:
           # Flow Inputs
           destination-flow-stage:
             ${{ fromJson(inputs.input-json).destination-flow-stage }}
+          # Connector Inputs
+          destination-connector-org-id:
+            ${{ fromJson(inputs.input-json).destination-connector-org-id }}
           # Template Inputs
           destination-template-org-id:
             ${{ fromJson(inputs.input-json).destination-template-org-id }}

@@ -22,7 +22,7 @@ async function exportModels(authToken, projectId, ids, domain) {
     )
     return response.data.data.exportModels
   } catch (error) {
-    core.debug(`Unable to fetch models. Error: ${error}`)
+    core.error(`Unable to fetch models. Error: ${error}`)
   }
 }
 
@@ -40,7 +40,7 @@ async function importModels(authToken, projectId, models, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import models. Error: ${error}`)
+    core.error(`Unable to import models. Error: ${error}`)
   }
 }
 
