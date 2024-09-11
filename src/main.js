@@ -95,7 +95,7 @@ async function run() {
       const exportedConnectors = await exportConnectors(
         srcAuthToken,
         srcConnectorOrgId === 'community' ? 'community' : srcProjectId,
-        srcConnectorOrgId,
+        srcConnectorOrgId || srcProjectId,
         splitString(srcConnectorIdInput),
         splitString(srcConnectorGroupIdInput),
         srcDomain
@@ -106,7 +106,7 @@ async function run() {
         await importConnectors(
           desAuthToken,
           desConnectorOrgId === 'community' ? 'community' : desProjectId,
-          desConnectorOrgId,
+          desConnectorOrgId || desProjectId,
           exportedConnectors,
           desDomain
         )

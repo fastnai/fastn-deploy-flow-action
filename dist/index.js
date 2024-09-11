@@ -8892,8 +8892,8 @@ async function importConnectors(
     variables: {
       input: {
         projectId,
-        connectorId: orgId,
-        connectors: transformData(connectors)
+        orgId,
+        connectors
       }
     }
   })
@@ -8907,19 +8907,6 @@ async function importConnectors(
   } catch (error) {
     core.error(`Unable to import connectors. Error: ${error}`)
   }
-}
-
-// for backwards compatibility, TODO deprecate later
-function transformData(originalData) {
-  return originalData.map(obj => {
-    // Create a new object with the updated key
-    const newObj = {
-      ...obj,
-      connectors: obj.dataSources
-    }
-
-    return newObj
-  })
 }
 
 module.exports = {
@@ -9358,7 +9345,7 @@ async function run() {
       const exportedConnectors = await exportConnectors(
         srcAuthToken,
         srcConnectorOrgId === 'community' ? 'community' : srcProjectId,
-        srcConnectorOrgId,
+        srcConnectorOrgId || srcProjectId,
         splitString(srcConnectorIdInput),
         splitString(srcConnectorGroupIdInput),
         srcDomain
@@ -9369,7 +9356,7 @@ async function run() {
         await importConnectors(
           desAuthToken,
           desConnectorOrgId === 'community' ? 'community' : desProjectId,
-          desConnectorOrgId,
+          desConnectorOrgId || desProjectId,
           exportedConnectors,
           desDomain
         )
