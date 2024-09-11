@@ -94,7 +94,7 @@ async function run() {
       core.debug(`Exporting Connectors`)
       const exportedConnectors = await exportConnectors(
         srcAuthToken,
-        srcProjectId,
+        srcConnectorOrgId === 'community' ? 'community' : srcProjectId,
         srcConnectorOrgId,
         splitString(srcConnectorIdInput),
         splitString(srcConnectorGroupIdInput),
@@ -105,7 +105,7 @@ async function run() {
         core.debug(`Importing Connectors`)
         await importConnectors(
           desAuthToken,
-          desProjectId,
+          desConnectorOrgId === 'community' ? 'community' : desProjectId,
           desConnectorOrgId,
           exportedConnectors,
           desDomain
@@ -118,7 +118,7 @@ async function run() {
       core.debug(`Exporting Templates`)
       const exportedTemplates = await exportTemplates(
         srcAuthToken,
-        srcProjectId,
+        srcTemplateOrgId === 'community' ? 'community' : srcProjectId,
         srcTemplateOrgId,
         splitString(srcTemplateIdInput),
         srcDomain
@@ -128,7 +128,7 @@ async function run() {
         core.debug(`Importing Templates`)
         await importTemplates(
           desAuthToken,
-          desProjectId,
+          desTemplateOrgId === 'community' ? 'community' : desProjectId,
           desTemplateOrgId,
           exportedTemplates,
           desDomain
@@ -186,7 +186,7 @@ async function run() {
             desFlowStage,
             desDomain
           )
-          core.debug(`Deployed ${apiName} to ${desFlowStage}`)
+          core.debug(`Deployed ${apiName} to ${desFlowStage || 'LIVE'}`)
         }
       }
     }

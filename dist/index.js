@@ -8851,7 +8851,7 @@ async function exportConnectors(
   authToken,
   projectId,
   orgId,
-  connectorIds,
+  dataSourceIds,
   groupIds,
   domain
 ) {
@@ -8860,7 +8860,7 @@ async function exportConnectors(
       exportConnectors(input: $input) 
     }`,
     variables: {
-      input: { projectId, connectorId: orgId, connectorIds, groupIds }
+      input: { projectId, orgId, dataSourceIds, groupIds }
     }
   })
 
@@ -8874,7 +8874,7 @@ async function exportConnectors(
     )
     return response.data.data.exportConnectors
   } catch (error) {
-    core.debug(`Unable to fetch connectors. Error: ${error}`)
+    core.error(`Unable to fetch connectors. Error: ${error}`)
   }
 }
 
@@ -8889,17 +8889,37 @@ async function importConnectors(
     query: `mutation importConnectors($input: ImportConnectorsResourcesInput) {
       importConnectors(input: $input) 
     }`,
-    variables: { input: { projectId, connectorId: orgId, connectors } }
+    variables: {
+      input: {
+        projectId,
+        connectorId: orgId,
+        connectors: transformData(connectors)
+      }
+    }
   })
 
   const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
+    core.debug(`${JSON.stringify(config)}`)
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import connectors. Error: ${error}`)
+    core.error(`Unable to import connectors. Error: ${error}`)
   }
+}
+
+// for backwards compatibility, TODO deprecate later
+function transformData(originalData) {
+  return originalData.map(obj => {
+    // Create a new object with the updated key
+    const newObj = {
+      ...obj,
+      connectors: obj.dataSources
+    }
+
+    return newObj
+  })
 }
 
 module.exports = {
@@ -8937,7 +8957,7 @@ async function exportApis(authToken, projectId, domain, stage, ids) {
     )
     return response.data.data.exportApis
   } catch (error) {
-    core.debug(`Unable to fetch flows. Error: ${error}`)
+    core.error(`Unable to fetch flows. Error: ${error}`)
   }
 }
 
@@ -8955,7 +8975,7 @@ async function importApis(authToken, projectId, apis, stage, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import flows. Error: ${error}`)
+    core.error(`Unable to import flows. Error: ${error}`)
   }
 }
 
@@ -8992,7 +9012,7 @@ async function deployApiFlowToStage(
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to deploy flow ${apiName}. Error: ${error}`)
+    core.error(`Unable to deploy flow ${apiName}. Error: ${error}`)
   }
 }
 
@@ -9032,7 +9052,7 @@ async function exportModels(authToken, projectId, ids, domain) {
     )
     return response.data.data.exportModels
   } catch (error) {
-    core.debug(`Unable to fetch models. Error: ${error}`)
+    core.error(`Unable to fetch models. Error: ${error}`)
   }
 }
 
@@ -9050,7 +9070,7 @@ async function importModels(authToken, projectId, models, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import models. Error: ${error}`)
+    core.error(`Unable to import models. Error: ${error}`)
   }
 }
 
@@ -9089,7 +9109,7 @@ async function exportTemplates(authToken, projectId, orgId, ids, domain) {
     )
     return response.data.data.exportTemplates
   } catch (error) {
-    core.debug(`Unable to fetch templates. Error: ${error}`)
+    core.error(`Unable to fetch templates. Error: ${error}`)
   }
 }
 
@@ -9107,7 +9127,7 @@ async function importTemplates(authToken, projectId, orgId, templates, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import templates. Error: ${error}`)
+    core.error(`Unable to import templates. Error: ${error}`)
   }
 }
 
@@ -9146,7 +9166,7 @@ async function exportWebhooks(authToken, projectId, ids, domain) {
     )
     return response.data.data.exportWebhooks
   } catch (error) {
-    core.debug(`Unable to fetch webhooks. Error: ${error}`)
+    core.error(`Unable to fetch webhooks. Error: ${error}`)
   }
 }
 
@@ -9164,7 +9184,7 @@ async function importWebhooks(authToken, projectId, webhooks, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import webhooks. Error: ${error}`)
+    core.error(`Unable to import webhooks. Error: ${error}`)
   }
 }
 
@@ -9203,7 +9223,7 @@ async function exportWidgetConnectors(authToken, projectId, ids, domain) {
     )
     return response.data.data.exportWidgetConnectors
   } catch (error) {
-    core.debug(`Unable to fetch widget connectors. Error: ${error}`)
+    core.error(`Unable to fetch widget connectors. Error: ${error}`)
   }
 }
 
@@ -9226,7 +9246,7 @@ async function importWidgetConnectors(
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import widget connectors. Error: ${error}`)
+    core.error(`Unable to import widget connectors. Error: ${error}`)
   }
 }
 
@@ -9337,7 +9357,7 @@ async function run() {
       core.debug(`Exporting Connectors`)
       const exportedConnectors = await exportConnectors(
         srcAuthToken,
-        srcProjectId,
+        srcConnectorOrgId === 'community' ? 'community' : srcProjectId,
         srcConnectorOrgId,
         splitString(srcConnectorIdInput),
         splitString(srcConnectorGroupIdInput),
@@ -9348,7 +9368,7 @@ async function run() {
         core.debug(`Importing Connectors`)
         await importConnectors(
           desAuthToken,
-          desProjectId,
+          desConnectorOrgId === 'community' ? 'community' : desProjectId,
           desConnectorOrgId,
           exportedConnectors,
           desDomain
@@ -9361,7 +9381,7 @@ async function run() {
       core.debug(`Exporting Templates`)
       const exportedTemplates = await exportTemplates(
         srcAuthToken,
-        srcProjectId,
+        srcTemplateOrgId === 'community' ? 'community' : srcProjectId,
         srcTemplateOrgId,
         splitString(srcTemplateIdInput),
         srcDomain
@@ -9371,7 +9391,7 @@ async function run() {
         core.debug(`Importing Templates`)
         await importTemplates(
           desAuthToken,
-          desProjectId,
+          desTemplateOrgId === 'community' ? 'community' : desProjectId,
           desTemplateOrgId,
           exportedTemplates,
           desDomain
@@ -9429,7 +9449,7 @@ async function run() {
             desFlowStage,
             desDomain
           )
-          core.debug(`Deployed ${apiName} to ${desFlowStage}`)
+          core.debug(`Deployed ${apiName} to ${desFlowStage || 'LIVE'}`)
         }
       }
     }

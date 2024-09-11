@@ -22,7 +22,7 @@ async function exportWebhooks(authToken, projectId, ids, domain) {
     )
     return response.data.data.exportWebhooks
   } catch (error) {
-    core.debug(`Unable to fetch webhooks. Error: ${error}`)
+    core.error(`Unable to fetch webhooks. Error: ${error}`)
   }
 }
 
@@ -40,7 +40,7 @@ async function importWebhooks(authToken, projectId, webhooks, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import webhooks. Error: ${error}`)
+    core.error(`Unable to import webhooks. Error: ${error}`)
   }
 }
 

@@ -22,7 +22,7 @@ async function exportApis(authToken, projectId, domain, stage, ids) {
     )
     return response.data.data.exportApis
   } catch (error) {
-    core.debug(`Unable to fetch flows. Error: ${error}`)
+    core.error(`Unable to fetch flows. Error: ${error}`)
   }
 }
 
@@ -40,7 +40,7 @@ async function importApis(authToken, projectId, apis, stage, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import flows. Error: ${error}`)
+    core.error(`Unable to import flows. Error: ${error}`)
   }
 }
 
@@ -77,7 +77,7 @@ async function deployApiFlowToStage(
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to deploy flow ${apiName}. Error: ${error}`)
+    core.error(`Unable to deploy flow ${apiName}. Error: ${error}`)
   }
 }
 

@@ -22,7 +22,7 @@ async function exportWidgetConnectors(authToken, projectId, ids, domain) {
     )
     return response.data.data.exportWidgetConnectors
   } catch (error) {
-    core.debug(`Unable to fetch widget connectors. Error: ${error}`)
+    core.error(`Unable to fetch widget connectors. Error: ${error}`)
   }
 }
 
@@ -45,7 +45,7 @@ async function importWidgetConnectors(
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import widget connectors. Error: ${error}`)
+    core.error(`Unable to import widget connectors. Error: ${error}`)
   }
 }
 

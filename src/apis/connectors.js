@@ -7,7 +7,7 @@ async function exportConnectors(
   authToken,
   projectId,
   orgId,
-  connectorIds,
+  dataSourceIds,
   groupIds,
   domain
 ) {
@@ -16,7 +16,7 @@ async function exportConnectors(
       exportConnectors(input: $input) 
     }`,
     variables: {
-      input: { projectId, connectorId: orgId, connectorIds, groupIds }
+      input: { projectId, orgId, dataSourceIds, groupIds }
     }
   })
 
@@ -30,7 +30,7 @@ async function exportConnectors(
     )
     return response.data.data.exportConnectors
   } catch (error) {
-    core.debug(`Unable to fetch connectors. Error: ${error}`)
+    core.error(`Unable to fetch connectors. Error: ${error}`)
   }
 }
 
@@ -45,17 +45,37 @@ async function importConnectors(
     query: `mutation importConnectors($input: ImportConnectorsResourcesInput) {
       importConnectors(input: $input) 
     }`,
-    variables: { input: { projectId, connectorId: orgId, connectors } }
+    variables: {
+      input: {
+        projectId,
+        connectorId: orgId,
+        connectors: transformData(connectors)
+      }
+    }
   })
 
   const config = getGraphQlReqConfigs(domain, authToken, projectId, data)
 
   try {
+    core.debug(`${JSON.stringify(config)}`)
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import connectors. Error: ${error}`)
+    core.error(`Unable to import connectors. Error: ${error}`)
   }
+}
+
+// for backwards compatibility, TODO deprecate later
+function transformData(originalData) {
+  return originalData.map(obj => {
+    // Create a new object with the updated key
+    const newObj = {
+      ...obj,
+      connectors: obj.dataSources
+    }
+
+    return newObj
+  })
 }
 
 module.exports = {

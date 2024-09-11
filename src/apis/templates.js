@@ -22,7 +22,7 @@ async function exportTemplates(authToken, projectId, orgId, ids, domain) {
     )
     return response.data.data.exportTemplates
   } catch (error) {
-    core.debug(`Unable to fetch templates. Error: ${error}`)
+    core.error(`Unable to fetch templates. Error: ${error}`)
   }
 }
 
@@ -40,7 +40,7 @@ async function importTemplates(authToken, projectId, orgId, templates, domain) {
     const response = await axios.request(config)
     core.debug(response.data)
   } catch (error) {
-    core.debug(`Unable to import templates. Error: ${error}`)
+    core.error(`Unable to import templates. Error: ${error}`)
   }
 }
 
